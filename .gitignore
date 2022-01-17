@@ -1,0 +1,9 @@
+node_modules
+.env
+WunderNFT.json
+wunder_pass_data.json
+
+.vscode
+artifacts
+cache
+node_modules
