@@ -7,3 +7,7 @@ wunder_pass_data.json
 artifacts
 cache
 node_modules
+
+*.md
+!README.md
+!deployed/*.json

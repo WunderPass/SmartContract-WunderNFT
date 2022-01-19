@@ -85,7 +85,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     bool public mintingPaused = false;
 
     // events
-    event WunderPassMinted(uint tokenId, WunderPass wunderPass);
+    event WunderPassMinted(uint indexed tokenId, address indexed owner, string status, string pattern, string wonder, string edition);
 
     constructor(string[] memory _names, string[] memory _parents) 
         VRFConsumerBase(VRFCoordinator, linkToken)
@@ -110,24 +110,12 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     }
 
     function mintForUser(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
-        require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
-        require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
-        address owner = _owner;
-        string memory _statusProp = determineStatus();
-        string memory _editionProp = determineEdition(_edition, 1);
-        uint tokenId = tokenIds.current();
-        bytes32 requestId = getRandomNumber();
-        WunderPass memory wunderPass = WunderPass(owner, tokenId, _statusProp, _editionProp, "", "");
-        tokenIdToOwner[tokenId] = owner;
-        requestIdToTokenId[requestId] = tokenId;
-        tokenIdToWunderPass[tokenId] = wunderPass;
-        _mint(owner, tokenId);
-        tokenIds.increment();
+        mintInternal(_edition, _owner);
     }
 
     function mint(string memory _edition) public payable {
-        require(msg.value == publicPrice);
-        mintForUser(_edition, msg.sender);
+        require(msg.value >= publicPrice);
+        mintInternal(_edition, msg.sender);
     }
 
     function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
@@ -147,6 +135,22 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
         tokenIds.increment();
 
         fulfillRandomness(requestId, uint256(keccak256(abi.encode(tokenId, 1, _edition))));
+    }
+
+    function mintInternal(string memory _edition, address _owner) internal {
+        require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
+        require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
+        address owner = _owner;
+        string memory _statusProp = determineStatus();
+        string memory _editionProp = determineEdition(_edition, 1);
+        uint tokenId = tokenIds.current();
+        bytes32 requestId = getRandomNumber();
+        WunderPass memory wunderPass = WunderPass(owner, tokenId, _statusProp, _editionProp, "", "");
+        tokenIdToOwner[tokenId] = owner;
+        requestIdToTokenId[requestId] = tokenId;
+        tokenIdToWunderPass[tokenId] = wunderPass;
+        _mint(owner, tokenId);
+        tokenIds.increment();
     }
 
     function currentTokenId() public view returns(uint) {
@@ -240,7 +244,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
         string memory wonder = determineWonder(randTwo);
         wunderPass.pattern = pattern;
         wunderPass.wonder = wonder;
-        emit WunderPassMinted(tokenId, wunderPass);
+        address owner = tokenIdToOwner[tokenId];
+        emit WunderPassMinted(tokenId, owner, wunderPass.status, pattern, wonder, wunderPass.edition);
     }
 
     // Get two random numbers from one
@@ -304,5 +309,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
 
     function removeAdmin(address _admin) external onlyRole(OWNER_ROLE) {
         _revokeRole(ADMIN_ROLE, _admin);
+    }
+
+    function isOwner() external view returns (bool) {
+        return hasRole(OWNER_ROLE, msg.sender);
+    }
+
+    function isAdmin() external view returns (bool) {
+        return hasRole(ADMIN_ROLE, msg.sender);
     }
 }

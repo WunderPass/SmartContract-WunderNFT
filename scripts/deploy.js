@@ -1,4 +1,3 @@
-import { ethers } from "ethers";
 const fs = require('fs');
 
 const names = ["Berlin", "Düsseldorf", "London", "Oxford", "NewYork", "LosAngeles", "Shanghai", "Peking", "Deutschland", "England", "USA", "China", "Europa", "Nordamerika", "Asien", "Welt"]
@@ -17,7 +16,7 @@ async function main() {
 
   const contractData = {
     address: contract.address,
-    abi: contract.interface.format('json')
+    abi: contract.interface.format('full')
   }
 
   fs.writeFileSync('deployed/WunderNFT.json', JSON.stringify(contractData));
