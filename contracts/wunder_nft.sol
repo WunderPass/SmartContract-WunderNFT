@@ -12,9 +12,10 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
-contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
+contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     // Counter for Token Id
     using Counters for Counters.Counter;
     Counters.Counter private tokenIds;
@@ -56,8 +57,6 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     }
 
     // NFT Mapping
-    // tokenId => ownerAddress
-    mapping(uint => address) tokenIdToOwner;
     // requestId => tokenId
     mapping(bytes32 => uint) requestIdToTokenId;
     // tokenId => WunderPass
@@ -109,6 +108,18 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
         return super.supportsInterface(interfaceId);
     }
 
+    /**
+    * Override isApprovedForAll to auto-approve OS's proxy contract
+    */
+    function isApprovedForAll(address _owner, address _operator) public override view returns (bool isOperator) {
+        // if OpenSea's ERC721 Proxy Address is detected, auto-return true
+        if (_operator == address(0x58807baD0B376efc12F5AD86aAc70E78ed67deaE)) {
+            return true;
+        }
+        // otherwise, use the default ERC721.isApprovedForAll()
+        return ERC721.isApprovedForAll(_owner, _operator);
+    }
+
     function mintForUser(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
         mintInternal(_edition, _owner);
     }
@@ -128,7 +139,6 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
 
         bytes32 requestId = bytes32(tokenId);
         WunderPass memory wunderPass = WunderPass(owner, tokenId, _statusProp, _editionProp, "", "");
-        tokenIdToOwner[tokenId] = owner;
         requestIdToTokenId[requestId] = tokenId;
         tokenIdToWunderPass[tokenId] = wunderPass;
         _mint(owner, tokenId);
@@ -140,16 +150,14 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     function mintInternal(string memory _edition, address _owner) internal {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
         require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
-        address owner = _owner;
         string memory _statusProp = determineStatus();
         string memory _editionProp = determineEdition(_edition, 1);
         uint tokenId = tokenIds.current();
         bytes32 requestId = getRandomNumber();
-        WunderPass memory wunderPass = WunderPass(owner, tokenId, _statusProp, _editionProp, "", "");
-        tokenIdToOwner[tokenId] = owner;
+        WunderPass memory wunderPass = WunderPass(_owner, tokenId, _statusProp, _editionProp, "", "");
         requestIdToTokenId[requestId] = tokenId;
         tokenIdToWunderPass[tokenId] = wunderPass;
-        _mint(owner, tokenId);
+        _mint(_owner, tokenId);
         tokenIds.increment();
     }
 
@@ -231,7 +239,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     }
 
     function getRandomNumber() internal returns (bytes32 requestId) {
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
         return requestRandomness(keyHash, fee);
     }
 
@@ -244,7 +252,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
         string memory wonder = determineWonder(randTwo);
         wunderPass.pattern = pattern;
         wunderPass.wonder = wonder;
-        address owner = tokenIdToOwner[tokenId];
+        address owner = ownerOf(tokenId);
         emit WunderPassMinted(tokenId, owner, wunderPass.status, pattern, wonder, wunderPass.edition);
     }
 
@@ -256,6 +264,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
     }
 
     function getWunderPass(uint tokenId) public view returns (WunderPass memory) {
+        require(_exists(tokenId), "This WunderPass does not exist");
         return tokenIdToWunderPass[tokenId];
     }
 
@@ -276,12 +285,15 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
 
     // Modify Public Price
     function setPublicPrice(uint _newPrice) external onlyRole(OWNER_ROLE) {
-        publicPrice = _newPrice;
+        publicPrice = _newPrice * 10**15; // Always in Finney (Lowest possible Price = 0.001 ether)
     }
 
-    // Reactivate Minting
-    function reactivateMinting() external onlyRole(OWNER_ROLE) {
+    function activateMinting() external onlyRole(OWNER_ROLE) {
         mintingPaused = false;
+    }
+
+    function pauseMinting() external onlyRole(OWNER_ROLE) {
+        mintingPaused = true;
     }
 
     // Withdraw functions
@@ -317,5 +329,48 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl {
 
     function isAdmin() external view returns (bool) {
         return hasRole(ADMIN_ROLE, msg.sender);
+    }
+
+    function tokensOfAddress(address _owner) public view returns (uint[] memory) {
+        uint count = balanceOf(_owner);
+        uint[] memory ownerTokens = new uint[](count);
+        if (count == 0) {
+            return ownerTokens;
+        }
+
+        for (uint256 index = 0; index < currentTokenId(); index++) {
+            if (ownerOf(index) == _owner) {
+                count = count - 1;
+                ownerTokens[count] = index;
+            }
+        }
+
+        return ownerTokens;
+    }
+
+    function tokenIdToOwn(uint id) public view returns (address) {
+        return ownerOf(id);
+    }
+
+    function bestStatusOf(address _owner) external view returns (string memory) {
+        uint[] memory ownerTokens = tokensOfAddress(_owner);
+        return getWunderPass(ownerTokens[ownerTokens.length - 1]).status;
+    }
+
+    function bestWonderOf(address _owner) external view returns (string memory) {
+        uint[] memory ownerTokens = tokensOfAddress(_owner);
+        string[] memory ownerWonders = new string[](ownerTokens.length);
+
+        for (uint256 index = 0; index < ownerTokens.length; index++) {
+            ownerWonders[index] = getWunderPass(ownerTokens[index]).wonder;
+        }
+
+        for (uint256 wonderInd = 0; wonderInd < wonders.length; wonderInd++) {
+            for (uint256 index = 0; index < ownerWonders.length; index++) {
+                if (keccak256(abi.encodePacked(wonders[wonderInd])) == keccak256(abi.encodePacked(ownerWonders[index]))) {
+                    return wonders[wonderInd];
+                }
+            }
+        }
     }
 }
