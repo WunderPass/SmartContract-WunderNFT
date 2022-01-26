@@ -47,7 +47,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     // address internal linkToken = 0xb0897686c545045aFc77CF20eC7A532E3120E0F1;
 
     // Price & Edition handling
-    uint public publicPrice = 1000 * 10 ** 18; // 1000 ether
+    uint public publicPrice = 420 * 10 ** 18; // 420 MATIC
     uint public editionThreshold = 10;
     mapping(string => Edition) editions;
     struct Edition {
@@ -81,7 +81,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     uint[] internal wonderAllocation;
 
     // Pausing
-    bool public mintingPaused = false;
+    bool public mintingPaused = true;
 
     // events
     event WunderPassMinted(uint indexed tokenId, address indexed owner, string status, string pattern, string wonder, string edition);
@@ -94,7 +94,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             editions[_names[i]] = Edition(_names[i], _parents[i], 0);
         }
         
-        patterns = ["Bars", "Dots", "Lines", "Safari", "Stones", "Waves", "Worms", "WunderPass", "ZigZag"];
+        patterns = ["Safari", "Bars", "Dots", "Waves", "Stones", "WunderPass", "ZigZag", "Lines", "Worms"];
        
         wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
         wonderAllocation = [1, 2, 4, 8, 16, 32, 64, 1000];
@@ -222,16 +222,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
 
     function determinePattern(uint randomNumber) internal view returns(string memory) {
         uint modNumber = (randomNumber % 512) + 1;
-        uint patternIndex = 8;
 
         for (uint i = 0; i < patterns.length; i++) {
             if (modNumber >= 512 / (2 ** (i + 1))) {
-                patternIndex = i;
-                break;
+                return patterns[i];
             }
         }
-
-        return patterns[patternIndex];
+        return patterns[8];
     }
 
     function getCounter(string memory _edition) public view returns(uint) {
