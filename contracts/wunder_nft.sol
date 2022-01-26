@@ -15,6 +15,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
+// Slava: Bitte nach Möglichkeiten die Funktionen zumindest mit einem Satz Kommentar versehen.
+
 contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     // Counter for Token Id
     using Counters for Counters.Counter;
@@ -94,6 +96,10 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             editions[_names[i]] = Edition(_names[i], _parents[i], 0);
         }
         
+        // SLava: Warum definiert man die patterns und die wonders innerhalb des Konstruktors und nicht außerhalb, wie die anderen Konstanten
+        // wie "mintingPaused = true"?
+        // Gleiches gilt eigentlich für wonderAllocation
+        
         patterns = ["Safari", "Bars", "Dots", "Waves", "Stones", "WunderPass", "ZigZag", "Lines", "Worms"];
        
         wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
@@ -112,6 +118,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     * Override isApprovedForAll to auto-approve OS's proxy contract
     */
     function isApprovedForAll(address _owner, address _operator) public override view returns (bool isOperator) {
+        
+       // Slava: Sollte '0x58807baD0B376efc12F5AD86aAc70E78ed67deaE' nicht lieber als Konstante oben definiert werden? 
+       
         // if OpenSea's ERC721 Proxy Address is detected, auto-return true
         if (_operator == address(0x58807baD0B376efc12F5AD86aAc70E78ed67deaE)) {
             return true;
@@ -129,6 +138,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         mintInternal(_edition, msg.sender);
     }
 
+    // Slava: Kommentieren, dass es rauskommt
     function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
         require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
@@ -165,6 +175,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         return tokenIds.current();
     }
 
+    // Slava: Wir sollten hierbei Konstanten für die Werte 200, 1800, 14600 etc. benutzen und dann auch nicht 199, 1799 etc. schreiben, sondern 
+    // const_a - 1, const_b - 1 etc.
     function determineStatus() internal returns(string memory) {
         uint currentId = tokenIds.current();
         if (currentId == 199 || currentId == 1799 || currentId == 14599 || currentId == 116999 || currentId == 936199 || currentId == 7489799 || currentId == 59918599 || currentId == 479348999) {
@@ -189,6 +201,34 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         } else {
             return "White";
         }
+        
+        
+        // Slava: Nur ne Stil-Frage, ich würde jedoch folgende Schreibweis immer bevorzugen, wenn man innerhalb eines if-Blocks return:
+//        if (currentId < 200) {
+//            return "Diamond";
+//        }         
+//        if (currentId < 1800) {
+//            return "Black";
+//        } 
+//        if (currentId < 14600) {
+//            return "Pearl";
+//        } 
+//        if (currentId < 117000) {
+//            return "Platinum";
+//        } 
+//        if (currentId < 936200) {
+//            return "Ruby";
+//        } 
+//        if (currentId < 7489800) {
+//            return "Gold";
+//        } 
+//        if (currentId < 59918600) {
+//            return "Silver";
+//        } 
+//        if (currentId < 479349000) {
+//            return "Bronze";
+//        }
+//        return "White";
     }
 
     function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory) {
@@ -202,6 +242,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
         }
+        
+        // Slava: Gleicher Kommentar bzgl. else-if wie oben ;)
     }
 
     function determineWonder(uint randomNumber) internal returns(string memory) {
@@ -215,6 +257,11 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             }
         }
 
+        // Slava: Über die folgende Zeile müssen wir nochmal sprechen. Dies hab ich im White-Paper nämlich tatsächlich bewusst anders gewollt.
+        // Und zwar so, dass die seltenen Wunder auch tatsächlich eine geringere Wahrscheinlichkeit haben als die häufigeren.
+        // Der Vorteil deiner aktuellen Implementierung ist, dass sie halbwegs simpel ist.
+        // Der Nachteil aber, dass diese das first-come-first-serve-Prinzip befeuert, denn nach jedem 256. Pass lohnt sich das Minten plötzlich viel mehr
+        // als kurz vor Ende des 256er-Zykel, weil da noch die seltene Wunder verfügbar sind und die Chance auf diese mit 1:8 recht hoch ist.
         uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
         allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
         return wonders[wonderIndex];
@@ -282,6 +329,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
 
     // Modify Public Price
     function setPublicPrice(uint _newPrice) external onlyRole(OWNER_ROLE) {
+        // Slava: Kommentar auf MATIC beziehen bzw. zumindest ergänzend erwähnen
         publicPrice = _newPrice * 10**15; // Always in Finney (Lowest possible Price = 0.001 ether)
     }
 
