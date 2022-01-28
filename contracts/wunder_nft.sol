@@ -246,7 +246,37 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         // Slava: Gleicher Kommentar bzgl. else-if wie oben ;)
     }
 
+//    function determineWonder(uint randomNumber) internal returns(string memory) {
+//        delete possibleWonders;
+//        uint tokenId = tokenIds.current();
+//
+//        for (uint i = 0; i < allocatedWonders.length; i++) {
+//            uint n = allocatedWonders[i] * 256 / tokenId;
+//            if (n < wonderAllocation[i]) {
+//                possibleWonders.push(i);
+//            }
+//        }
+//
+//        uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
+//        allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
+//        return wonders[wonderIndex];
+//    }
+    
+    
+    
     function determineWonder(uint randomNumber) internal returns(string memory) {
+        
+        // Dieses Array enthält die insgesamt verfügbaren (nicht aktuell noch verfügbaren) Wunder pro 256 Wunder.
+        // Dieses Array ist fast identisch mit dem wonderAllocation-Array. Evtl kann man dieses Array auch an Stelle von wonderAllocation benutzen.
+        // Wichtig hierbei ist die 129 für das letzte Wunder, damit sich die Counts der einzelnen Elemente dieses Arrays auf genau 256 summieren.
+        uint[] internal wonderCounts = [1, 2, 4, 8, 16, 32, 64, 129];
+        
+        // Dieses Array dient der Randomness
+        uint[] internal possibleWondersRandomnessBounds;
+        
+        // Counter für die Randomness-Grenzen
+        uint availableWondersCount = 0;
+        
         delete possibleWonders;
         uint tokenId = tokenIds.current();
 
@@ -254,18 +284,43 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             uint n = allocatedWonders[i] * 256 / tokenId;
             if (n < wonderAllocation[i]) {
                 possibleWonders.push(i);
+                availableWondersCount = availableWondersCount + wonderCounts[i];
+                possibleWondersRandomnessBounds.push(availableWondersCount - 1);
             }
         }
-
-        // Slava: Über die folgende Zeile müssen wir nochmal sprechen. Dies hab ich im White-Paper nämlich tatsächlich bewusst anders gewollt.
-        // Und zwar so, dass die seltenen Wunder auch tatsächlich eine geringere Wahrscheinlichkeit haben als die häufigeren.
-        // Der Vorteil deiner aktuellen Implementierung ist, dass sie halbwegs simpel ist.
-        // Der Nachteil aber, dass diese das first-come-first-serve-Prinzip befeuert, denn nach jedem 256. Pass lohnt sich das Minten plötzlich viel mehr
-        // als kurz vor Ende des 256er-Zykel, weil da noch die seltene Wunder verfügbar sind und die Chance auf diese mit 1:8 recht hoch ist.
-        uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
-        allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
-        return wonders[wonderIndex];
+        
+        // Es ist possibleWonders.length = possibleWondersRandomnessBounds.length
+        
+        // Beispiele:
+        
+        // Fall 1: Alle Wunder sind noch verfügbar. Dann sind
+        // possibleWonders = [0, 1, 2, 3, 4, 5, 6, 7]
+        // possibleWondersRandomnessBounds = [0, 2, 6, 14, 30, 62, 126, 255]
+        // availableWondersCount = 256
+        
+        // Fall 2: Wunder 0, 2 und 4 sind weg
+        // possibleWonders = [1, 3, 5, 6, 7]
+        // possibleWondersRandomnessBounds = [1, 9, 41, 105, 234]
+        // availableWondersCount = 235
+        
+        // Skaliert die Random-Zahl auf die noch verfügbaren Wunder(-Wahrscheinlichkeiten)
+        // Es ist zwingend scaledRandomNumber <= 256
+        uint scaledRandomNumber = randomNumber % availableWondersCount;
+        
+        // Im Beispiel-Fall 1 liegt scaledRandomNumber zwischen 0 und 255
+        // Im Beispiel-Fall 2 liegt scaledRandomNumber zwischen 0 und 234
+        
+        // Abhängig davon zwischen welchen Grenzen scaledRandomNumber liegt, wird das passende Wunder ausgewählt.
+        // Durch die aufsteigende Verteilung innerhalb von wonderCounts haben die selteneren Wunder eine entsprechend kleinere Wahrscheinlochkeit ausgewählt zu werden
+        for (uint i = 0; i < possibleWonders.length; i++) {
+            if (scaledRandomNumber <= possibleWondersRandomnessBounds[i]) {
+                uint wonderIndex = possibleWonders[i];
+                return wonders[wonderIndex];
+            }        
+        }
     }
+    
+    
 
     function determinePattern(uint randomNumber) internal view returns(string memory) {
         uint modNumber = (randomNumber % 512) + 1;
