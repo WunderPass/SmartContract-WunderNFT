@@ -6,6 +6,9 @@ const expect = chai.expect;
 const fs = require('fs');
 const names = ["Berlin", "Düsseldorf", "London", "Oxford", "NewYork", "LosAngeles", "Shanghai", "Peking", "Deutschland", "England", "USA", "China", "Europa", "Nordamerika", "Asien", "Welt"]
 const parents = ["Deutschland", "Deutschland", "England", "England", "USA", "USA", "China", "China", "Europa", "Europa", "Nordamerika", "Asien", "Welt", "Welt", "Welt", "Welt"]
+const keyHash = '0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4';
+const VRFCoordinator = '0x8C7382F9D8f56b33781fE506E897a4F1e2d17255';
+const linkToken = '0x326C977E6efc84E512bB9C30f76E30c160eD06FB';
 
 function wunderPassToJson(wunderpass) {
   const [owner, tokenId, status, edition, wonder, pattern] = wunderpass;
@@ -24,7 +27,7 @@ describe('WUNDER NFT CONTRACT', () => {
 
   beforeEach(async () => {
     WunderNft = await ethers.getContractFactory('WunderNFT');
-    contract = await WunderNft.deploy(names, parents);
+    contract = await WunderNft.deploy(names, parents, keyHash, VRFCoordinator, linkToken);
 
     [owner, user1, user2, _] = await ethers.getSigners();
   });
@@ -52,8 +55,8 @@ describe('WUNDER NFT CONTRACT', () => {
       await contract.setEditionThreshold(20);
       expect(await contract.editionThreshold()).to.equal(20);
   
-      await contract.setPublicPrice(2);
-      expect(await contract.publicPrice()).to.equal(2000000000000000);
+      await contract.setPublicPrice(2, 0);
+      expect(await contract.publicPrice()).to.equal(2);
     })
 
     it('Should not allow anyone else to set Price and threshold', async () => {
@@ -106,7 +109,24 @@ describe('WUNDER NFT CONTRACT', () => {
       await contract.mintTest('Berlin', user2.address)
       expect(await contract.currentTokenId()).to.equal(2)
     });
-    
+
+    it('Should pause the contract when a new status begins', async () => {
+      for(var i = 0; i < 200; i++) {
+        await contract.mintTest('Berlin', user1.address);
+      }
+      await expect(contract.mintTest('Berlin', user1.address)).to.be.revertedWith('Pausable: paused')
+    });
+
+    it('Should let the owner pause minting at any time', async () => {
+      await expect(contract.mintTest('Berlin', user1.address)).to.not.be.reverted
+      await contract.pause();
+      await expect(contract.mintTest('Berlin', user1.address)).to.be.revertedWith('Pausable: paused')
+      await contract.unpause();
+      await expect(contract.mintTest('Berlin', user1.address)).to.not.be.reverted
+    });
+  });
+
+  describe('Determine Correct Properties', () => {
     it('Should give the correct edition', async () => {
       await contract.setEditionThreshold(1);
       await contract.mintTest('Berlin', user1.address)
@@ -136,30 +156,33 @@ describe('WUNDER NFT CONTRACT', () => {
       await contract.mintTest('Welt', user1.address)
       expect(wunderPassToJson(await contract.getWunderPass(117)).edition).to.equal('Welt')
     });
-    
-    it('Should pause the contract when a new status begins', async () => {
-      for(var i = 0; i < 200; i++) {
-        await contract.mintTest('Berlin', user1.address);
-      }
-      await expect(contract.mintTest('Berlin', user1.address)).to.be.revertedWith('Minting is currently paused. The next drop is coming soon!')
-    });
-
-    it('Should let the owner pause minting at any time', async () => {
-      await expect(contract.mintTest('Berlin', user1.address)).to.not.be.reverted
-      await contract.pauseMinting();
-      await expect(contract.mintTest('Berlin', user1.address)).to.be.revertedWith('Minting is currently paused. The next drop is coming soon!')
-      await contract.activateMinting();
-      await expect(contract.mintTest('Berlin', user1.address)).to.not.be.reverted
-    });
 
     it('Should give the correct status', async () => {
       for(var i = 0; i < 200; i++) {
         await contract.mintTest('Berlin', user1.address);
       }
 
-      await contract.activateMinting();
+      await contract.unpause();
       await contract.mintTest('Berlin', user1.address)
       expect(wunderPassToJson(await contract.getWunderPass(200)).status).to.equal('Black')
+    });
+
+    it('Should determine wonders based on the correct distribution', async () => {
+      const wonders = {"Pyramids of Giza": 0, "Great Wall of China": 0, "Petra": 0, "Colosseum": 0, "Chichen Itza": 0, "Machu Picchu": 0, "Taj Mahal": 0, "Christ the Redeemer": 0};
+      
+      for(var i = 0; i < 256; i++) {
+        i == 200 && await contract.unpause();
+        await contract.mintTest('Berlin', user1.address);
+        wonders[wunderPassToJson(await contract.getWunderPass(i)).wonder] += 1;
+      }
+      expect(wonders["Pyramids of Giza"]).to.equal(1)
+      expect(wonders["Great Wall of China"]).to.equal(2)
+      expect(wonders["Petra"]).to.equal(4)
+      expect(wonders["Colosseum"]).to.equal(8)
+      expect(wonders["Chichen Itza"]).to.equal(16)
+      expect(wonders["Machu Picchu"]).to.equal(32)
+      expect(wonders["Taj Mahal"]).to.equal(64)
+      expect(wonders["Christ the Redeemer"]).to.equal(129)
     });
   });
 
@@ -197,7 +220,7 @@ describe('WUNDER NFT CONTRACT', () => {
         await contract.mintTest('Berlin', user1.address);
       }
       expect(await contract.bestStatusOf(user1.address)).to.equal('Diamond');
-      await contract.activateMinting();
+      await contract.unpause();
 
       await contract.mintTest('Berlin', user2.address);
       expect(await contract.bestStatusOf(user2.address)).to.equal('Black');
@@ -222,5 +245,4 @@ describe('WUNDER NFT CONTRACT', () => {
       }
     })
   })
-
 });

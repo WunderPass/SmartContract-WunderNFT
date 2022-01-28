@@ -7,50 +7,40 @@
 // ╚███╔███╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║██║ ╚████║██║        ██║   
 //  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝        ╚═╝   
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-// Slava: Bitte nach Möglichkeiten die Funktionen zumindest mit einem Satz Kommentar versehen.
-
-contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
-    // Counter for Token Id
+/** @title WunderNFT 
+  * @author The WunderPass Team
+*/
+contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable {
+    /// @notice Counter used for tokenIds
     using Counters for Counters.Counter;
     Counters.Counter private tokenIds;
 
-    // Access Control Roles
+    /// @notice Defining roles used by Access Control
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    // Random Number Generation
-    // RINKEBY
-    // bytes32 internal keyHash = 0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311;
-    // uint256 internal fee = 0.1 * 10 ** 18; // 0.1 LINK 
-    // address internal VRFCoordinator = 0xb3dCcb4Cf7a26f6cf6B120Cf5A73875B7BBc655B;
-    // address internal linkToken = 0x01BE23585060835E02B77ef475b0Cc51aA1e0709;
-    // ETH Mainnet
-    // bytes32 internal keyHash = 0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445;
-    // uint256 internal fee = 2 * 10 ** 18; // 2 LINK 
-    // address internal VRFCoordinator = 0xf0d54349aDdcf704F77AE15b96510dEA15cb7952;
-    // address internal linkToken = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
-    // Mumbai
-    bytes32 internal keyHash = 0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
-    uint256 internal fee = 0.0001 * 10 ** 18; // 0.0001 LINK 
-    address internal VRFCoordinator = 0x8C7382F9D8f56b33781fE506E897a4F1e2d17255;
-    address internal linkToken = 0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
-    // Polygon Mainnet
-    // bytes32 internal keyHash = 0xf86195cf7690c55907b2b611ebb7343a6f649bff128701cc542f0569e2c549da;
-    // uint256 internal fee = 0.0001 * 10 ** 18; // 0.0001 LINK 
-    // address internal VRFCoordinator = 0x3d2341ADb2D31f1c5530cDC622016af293177AE0;
-    // address internal linkToken = 0xb0897686c545045aFc77CF20eC7A532E3120E0F1;
+    /// @notice Declaring Variables for Random Number Generation
+    uint256 internal chainlinkFee = 0.0001 * 10 ** 18; // 0.0001 LINK 
+    bytes32 internal keyHash;
+    address internal VRFCoordinator;
+    address internal linkToken;
 
-    // Price & Edition handling
+    /// @notice OpenSea Whitelist Address
+    address internal openSeaProxyAddress = 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE;
+
+    /// @notice Declaring Variables for Price & Edition handling
     uint public publicPrice = 420 * 10 ** 18; // 420 MATIC
     uint public editionThreshold = 10;
+    uint public thresholdUpperLimit = 1000;
     mapping(string => Edition) editions;
     struct Edition {
         string name;
@@ -58,13 +48,14 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         uint counter;
     }
 
-    // NFT Mapping
-    // requestId => tokenId
+    /// @notice Declaring Variables for NFT Mapping
+    /// @dev mapping of requestId to tokenId
     mapping(bytes32 => uint) requestIdToTokenId;
-    // tokenId => WunderPass
+    /// @dev mapping of tokenId to WunderPass
     mapping(uint => WunderPass) tokenIdToWunderPass;
-    // tokenId => tokenUri
+    /// @dev mapping of tokenId to tokenUri
     mapping (uint => string) private _tokenURIs;
+
     struct WunderPass {
         address owner;
         uint tokenId;
@@ -74,38 +65,43 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         string pattern;
     }
 
-    // Patterns & Wonders
-    string[] patterns;
+    /// @notice Defining Status, Patterns & Wonders
+    string[] statusArray = ["Diamond", "Black", "Pearl", "Platinum", "Ruby", "Gold", "Silver", "Bronze", "White"];
+    uint[] statusLimits = [200, 1800, 14600, 117000, 936200, 7489800, 59918600, 479349000, 3834792200];
     
-    string[] wonders;
-    uint[] allocatedWonders;
+    string[] patterns = ["Safari Fun", "Triangular Bars", "Pointillism", "Wavy waves", "Stony desert", "WunderPass", "Zigzag", "Linear", "Curves"];
+
+    string[] wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
+    uint[] allocatedWonders = [0, 0, 0, 0, 0, 0, 0, 0];
     uint[] internal possibleWonders;
-    uint[] internal wonderAllocation;
+    uint[] internal possibleWondersRandomnessBounds;
+    
+    /// @notice Total available wonders per 256 WunderPasses by index
+    uint[] internal wonderAllocation = [1, 2, 4, 8, 16, 32, 64, 129];
 
-    // Pausing
-    bool public mintingPaused = true;
-
-    // events
+    /// @notice Defining the WunderPassMinted Event
     event WunderPassMinted(uint indexed tokenId, address indexed owner, string status, string pattern, string wonder, string edition);
 
-    constructor(string[] memory _names, string[] memory _parents) 
+    /** @notice Initializes the contract.
+      * @dev Sets up the editions mapping and grants the deployer OWNER_ROLE and ADMIN_ROLE
+      * @param _names All possible editions.
+      * @param _parents All parents of the editions.
+      * @param _keyHash The keyHash of ChainLink.
+      * @param _VRFCoordinator The VRFCoordinator address of ChainLink.
+      * @param _linkToken The LINK Token address.
+      */
+    constructor(string[] memory _names, string[] memory _parents, bytes32 _keyHash, address _VRFCoordinator, address _linkToken) 
         VRFConsumerBase(VRFCoordinator, linkToken)
         ERC721("WunderPassNFT", "WPN")
     {
         for (uint i = 0; i < _names.length; i++) {
             editions[_names[i]] = Edition(_names[i], _parents[i], 0);
         }
+
+        keyHash = _keyHash;
+        VRFCoordinator = _VRFCoordinator;
+        linkToken = _linkToken;
         
-        // SLava: Warum definiert man die patterns und die wonders innerhalb des Konstruktors und nicht außerhalb, wie die anderen Konstanten
-        // wie "mintingPaused = true"?
-        // Gleiches gilt eigentlich für wonderAllocation
-        
-        patterns = ["Safari", "Bars", "Dots", "Waves", "Stones", "WunderPass", "ZigZag", "Lines", "Worms"];
-       
-        wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
-        wonderAllocation = [1, 2, 4, 8, 16, 32, 64, 1000];
-        allocatedWonders = [0, 0, 0, 0, 0, 0, 0, 0];
-       
         _grantRole(OWNER_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
     }
@@ -114,34 +110,51 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         return super.supportsInterface(interfaceId);
     }
 
-    /**
-    * Override isApprovedForAll to auto-approve OS's proxy contract
-    */
+    /** @notice Override isApprovedForAll to auto-approve OS's proxy contract.
+      * @dev If OpenSea's ERC721 Proxy Address is detected, auto-return true.
+      * @dev Otherwise, use the default ERC721.isApprovedForAll().
+      */
     function isApprovedForAll(address _owner, address _operator) public override view returns (bool isOperator) {
-        
-       // Slava: Sollte '0x58807baD0B376efc12F5AD86aAc70E78ed67deaE' nicht lieber als Konstante oben definiert werden? 
-       
-        // if OpenSea's ERC721 Proxy Address is detected, auto-return true
-        if (_operator == address(0x58807baD0B376efc12F5AD86aAc70E78ed67deaE)) {
+        if (_operator == address(openSeaProxyAddress)) {
             return true;
         }
-        // otherwise, use the default ERC721.isApprovedForAll()
         return ERC721.isApprovedForAll(_owner, _operator);
     }
 
+    /** @notice Mints a WunderNFT for a given address.
+      * @dev Only callable by an ADMIN account.
+      * @param _edition The edition, a user requested.
+      * @param _owner The address of a user who will be the owner of the WunderNFT.
+      */
     function mintForUser(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
         mintInternal(_edition, _owner);
     }
 
+    /** @notice Mints a WunderNFT.
+      * @dev This is the public mint function.
+      * @param _edition The edition, a user requested.
+      */
     function mint(string memory _edition) public payable {
         require(msg.value >= publicPrice);
         mintInternal(_edition, msg.sender);
     }
 
-    // Slava: Kommentieren, dass es rauskommt
-    function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
+    //  ___   _  _______  ___   __    _    _______  _______  ______    _______  _______  _______ 
+    // |   | | ||       ||   | |  |  | |  |       ||       ||    _ |  |       ||       ||       |
+    // |   |_| ||    ___||   | |   |_| |  |  _____||_     _||   | ||  |    ___||  _____||  _____|
+    // |      _||   |___ |   | |       |  | |_____   |   |  |   |_||_ |   |___ | |_____ | |_____ 
+    // |     |_ |    ___||   | |  _    |  |_____  |  |   |  |    __  ||    ___||_____  ||_____  |
+    // |    _  ||   |___ |   | | | |   |   _____| |  |   |  |   |  | ||   |___  _____| | _____| |
+    // |___| |_||_______||___| |_|  |__|  |_______|  |___|  |___|  |_||_______||_______||_______|
+    //  ___   _  _______  __   __  __   __  _______    ______    _______  __   __  _______       
+    // |   | | ||       ||  |_|  ||  |_|  ||       |  |    _ |  |   _   ||  | |  ||       |      
+    // |   |_| ||   _   ||       ||       ||_     _|  |   | ||  |  |_|  ||  | |  ||  _____|      
+    // |      _||  | |  ||       ||       |  |   |    |   |_||_ |       ||  |_|  || |_____       
+    // |     |_ |  |_|  ||       ||       |  |   |    |    __  ||       ||       ||_____  |      
+    // |    _  ||       || ||_|| || ||_|| |  |   |    |   |  | ||   _   ||       | _____| |      
+    // |___| |_||_______||_|   |_||_|   |_|  |___|    |___|  |_||__| |__||_______||_______|      
+    function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) whenNotPaused() {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
-        require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
         address owner = _owner;
         string memory _statusProp = determineStatus();
         string memory _editionProp = determineEdition(_edition, 1);
@@ -157,9 +170,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         fulfillRandomness(requestId, uint256(keccak256(abi.encode(tokenId, 1, _edition))));
     }
 
-    function mintInternal(string memory _edition, address _owner) internal {
+    /** @notice The internal mint function that gets called by mintForUser and mint.
+      * @dev Determines Status and edition of the wunderpass and requests a random number from chainlink.
+      * @param _edition The edition, passed from mintForUser or mint.
+      * @param _owner The owner, passed from mintForUser or mint.
+      */
+    function mintInternal(string memory _edition, address _owner) internal whenNotPaused() {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
-        require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
         string memory _statusProp = determineStatus();
         string memory _editionProp = determineEdition(_edition, 1);
         uint tokenId = tokenIds.current();
@@ -171,158 +188,91 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         tokenIds.increment();
     }
 
-    function currentTokenId() public view returns(uint) {
+    /** @notice Gets the current tokenId.
+      * @return id The current tokenId.
+      */
+    function currentTokenId() public view returns(uint id) {
         return tokenIds.current();
     }
 
-    // Slava: Wir sollten hierbei Konstanten für die Werte 200, 1800, 14600 etc. benutzen und dann auch nicht 199, 1799 etc. schreiben, sondern 
-    // const_a - 1, const_b - 1 etc.
-    function determineStatus() internal returns(string memory) {
+    /** @notice Determines the status of a WunderNFT based on its tokenId.
+      * @dev The first 200 WunderNFTs will have a Diamond status. The next 1600 WunderNFTs will have a Black status etc.
+      * @return status The status of the WunderNFT.
+      */
+    function determineStatus() internal returns(string memory status) {
         uint currentId = tokenIds.current();
-        if (currentId == 199 || currentId == 1799 || currentId == 14599 || currentId == 116999 || currentId == 936199 || currentId == 7489799 || currentId == 59918599 || currentId == 479348999) {
-            mintingPaused = true;
-        } 
-        if (currentId < 200) {
-            return "Diamond";
-        } else if (currentId < 1800) {
-            return "Black";
-        } else if (currentId < 14600) {
-            return "Pearl";
-        } else if (currentId < 117000) {
-            return "Platinum";
-        } else if (currentId < 936200) {
-            return "Ruby";
-        } else if (currentId < 7489800) {
-            return "Gold";
-        } else if (currentId < 59918600) {
-            return "Silver";
-        } else if (currentId < 479349000) {
-            return "Bronze";
-        } else {
-            return "White";
+        for (uint256 index = 0; index < statusArray.length; index++) {
+            if (currentId == (statusLimits[index] - 1)) {
+                _pause();
+            }
+            if (currentId < statusLimits[index]) {
+                return statusArray[index];
+            }
         }
-        
-        
-        // Slava: Nur ne Stil-Frage, ich würde jedoch folgende Schreibweis immer bevorzugen, wenn man innerhalb eines if-Blocks return:
-//        if (currentId < 200) {
-//            return "Diamond";
-//        }         
-//        if (currentId < 1800) {
-//            return "Black";
-//        } 
-//        if (currentId < 14600) {
-//            return "Pearl";
-//        } 
-//        if (currentId < 117000) {
-//            return "Platinum";
-//        } 
-//        if (currentId < 936200) {
-//            return "Ruby";
-//        } 
-//        if (currentId < 7489800) {
-//            return "Gold";
-//        } 
-//        if (currentId < 59918600) {
-//            return "Silver";
-//        } 
-//        if (currentId < 479349000) {
-//            return "Bronze";
-//        }
-//        return "White";
+        return "White";
     }
 
-    function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory) {
+    /** @notice Determines the edition of a WunderNFT based on the requested edition.
+      * @dev Editions are limited and if the requested edition is not available anymore, the WunderNFT will get the parent edition etc.
+      * @dev The editions follow a geographical structure, i.e. World is the parent edition of Europe which is the parent edition of Germany which is the parent edition of Berlin.
+      * @dev The World edition is not limited.
+      * @param _edition The desired edition.
+      * @param _thresholdMultiplier A multiplier that increases with every call. Hence, Europe can be issued more often than Germany which can be issued more often than Berlin etc.
+      * @return edition The edition of the WunderNFT.
+      */
+    function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory edition) {
         Edition storage _desiredEdition = editions[_edition];
         if (keccak256(abi.encodePacked(_desiredEdition.name)) == keccak256(abi.encodePacked(_desiredEdition.parent))) {
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
-        } else if (_desiredEdition.counter >= (editionThreshold * _thresholdMultiplier)) {
-            return determineEdition(_desiredEdition.parent, (10 * _thresholdMultiplier));
-        } else {
-            _desiredEdition.counter += 1;
-            return _desiredEdition.name;
         }
-        
-        // Slava: Gleicher Kommentar bzgl. else-if wie oben ;)
+        if (_desiredEdition.counter >= (editionThreshold * _thresholdMultiplier)) {
+            return determineEdition(_desiredEdition.parent, (10 * _thresholdMultiplier));
+        }
+        _desiredEdition.counter += 1;
+        return _desiredEdition.name;
     }
-
-//    function determineWonder(uint randomNumber) internal returns(string memory) {
-//        delete possibleWonders;
-//        uint tokenId = tokenIds.current();
-//
-//        for (uint i = 0; i < allocatedWonders.length; i++) {
-//            uint n = allocatedWonders[i] * 256 / tokenId;
-//            if (n < wonderAllocation[i]) {
-//                possibleWonders.push(i);
-//            }
-//        }
-//
-//        uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
-//        allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
-//        return wonders[wonderIndex];
-//    }
     
-    
-    
-    function determineWonder(uint randomNumber) internal returns(string memory) {
-        
-        // Dieses Array enthält die insgesamt verfügbaren (nicht aktuell noch verfügbaren) Wunder pro 256 Wunder.
-        // Dieses Array ist fast identisch mit dem wonderAllocation-Array. Evtl kann man dieses Array auch an Stelle von wonderAllocation benutzen.
-        // Wichtig hierbei ist die 129 für das letzte Wunder, damit sich die Counts der einzelnen Elemente dieses Arrays auf genau 256 summieren.
-        uint[] internal wonderCounts = [1, 2, 4, 8, 16, 32, 64, 129];
-        
-        // Dieses Array dient der Randomness
-        uint[] internal possibleWondersRandomnessBounds;
-        
-        // Counter für die Randomness-Grenzen
+    /** @notice Determines the wonder of a WunderNFT based on randomness and previously issued wonders.
+      * @dev For more information on how the wonders are generated, see section 'NFT-Pass' in the White Paper: https://github.com/WunderPass/White-Paper
+      * @param randomNumber A random number generated by chainLink.
+      * @return wonder The wonder of the WunderNFT.
+      */
+    function determineWonder(uint randomNumber) internal returns(string memory wonder) {
         uint availableWondersCount = 0;
-        
+        delete possibleWondersRandomnessBounds;
         delete possibleWonders;
+
         uint tokenId = tokenIds.current();
 
         for (uint i = 0; i < allocatedWonders.length; i++) {
             uint n = allocatedWonders[i] * 256 / tokenId;
             if (n < wonderAllocation[i]) {
                 possibleWonders.push(i);
-                availableWondersCount = availableWondersCount + wonderCounts[i];
+                availableWondersCount = availableWondersCount + wonderAllocation[i];
                 possibleWondersRandomnessBounds.push(availableWondersCount - 1);
             }
         }
         
-        // Es ist possibleWonders.length = possibleWondersRandomnessBounds.length
-        
-        // Beispiele:
-        
-        // Fall 1: Alle Wunder sind noch verfügbar. Dann sind
-        // possibleWonders = [0, 1, 2, 3, 4, 5, 6, 7]
-        // possibleWondersRandomnessBounds = [0, 2, 6, 14, 30, 62, 126, 255]
-        // availableWondersCount = 256
-        
-        // Fall 2: Wunder 0, 2 und 4 sind weg. Dann sind
-        // possibleWonders = [1, 3, 5, 6, 7]
-        // possibleWondersRandomnessBounds = [1, 9, 41, 105, 234]
-        // availableWondersCount = 235
-        
-        // Skaliert die Random-Zahl auf die noch verfügbaren Wunder(-Wahrscheinlichkeiten)
-        // Es ist zwingend scaledRandomNumber <= 256
         uint scaledRandomNumber = randomNumber % availableWondersCount;
         
-        // Im Beispiel-Fall 1 liegt scaledRandomNumber zwischen 0 und 255
-        // Im Beispiel-Fall 2 liegt scaledRandomNumber zwischen 0 und 234
-        
-        // Abhängig davon zwischen welchen Grenzen scaledRandomNumber liegt, wird das passende Wunder ausgewählt.
-        // Durch die aufsteigende Verteilung innerhalb von wonderCounts haben die selteneren Wunder eine entsprechend kleinere Wahrscheinlochkeit ausgewählt zu werden
         for (uint i = 0; i < possibleWonders.length; i++) {
             if (scaledRandomNumber <= possibleWondersRandomnessBounds[i]) {
                 uint wonderIndex = possibleWonders[i];
+                allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
                 return wonders[wonderIndex];
             }        
         }
-    }
-    
-    
 
-    function determinePattern(uint randomNumber) internal view returns(string memory) {
+        return wonders[wonders.length - 1];
+    }
+
+    /** @notice Determines the pattern of a WunderNFT based on randomness.
+      * @dev The distribution of patterns is skewed so that the probabilities of the patterns are 1/2, 1/4, 1/8, 1/16 etc.
+      * @param randomNumber A random number generated by chainLink.
+      * @return pattern The pattern of the WunderNFT.
+      */
+    function determinePattern(uint randomNumber) internal view returns(string memory pattern) {
         uint modNumber = (randomNumber % 512) + 1;
 
         for (uint i = 0; i < patterns.length; i++) {
@@ -333,16 +283,28 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         return patterns[8];
     }
 
-    function getCounter(string memory _edition) public view returns(uint) {
+    /** @notice Returns how often the given edition was minted.
+      * @dev This function is primarily used for visualizing the distribution of minted editions.
+      * @param _edition Any valid edition.
+      * @return count How often the given edition was minted.
+      */
+    function getCounter(string memory _edition) public view returns(uint count) {
         return editions[_edition].counter;
     }
 
+    /** @notice Requests a random number from ChainLink.
+      * @return requestId Used to identify the request in fulfillRandomness.
+      */
     function getRandomNumber() internal returns (bytes32 requestId) {
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
-        return requestRandomness(keyHash, fee);
+        require(LINK.balanceOf(address(this)) >= chainlinkFee, "Not enough LINK");
+        return requestRandomness(keyHash, chainlinkFee);
     }
 
-    // Callback function from Chainlink
+    /** @notice Callback function from Chainlink.
+      * @dev This function finalizes the minting process by requesting the wonder and the pattern, minting the ERC721 token and emitting the WunderPassMinted event.
+      * @param requestId The id for the request coming from ChainLink.
+      * @param randomness The random number coming from ChainLink.
+      */
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
         uint tokenId = requestIdToTokenId[requestId];
         WunderPass storage wunderPass = tokenIdToWunderPass[tokenId];
@@ -355,83 +317,138 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         emit WunderPassMinted(tokenId, owner, wunderPass.status, pattern, wonder, wunderPass.edition);
     }
 
-    // Get two random numbers from one
-    function twoFromOne(uint256 randomValue) internal pure returns (uint, uint) {
+    /** @notice Get two random numbers from one.
+      * @param randomValue The id for the request coming from ChainLink.
+      * @return first The first random number.
+      * @return second The second random number.
+      */
+    function twoFromOne(uint256 randomValue) internal pure returns (uint first, uint second) {
         uint firstRandNumber = uint256(keccak256(abi.encode(randomValue, 1)));
         uint secondRandNumber = uint256(keccak256(abi.encode(randomValue, 2)));
         return (firstRandNumber, secondRandNumber);
     }
 
-    function getWunderPass(uint tokenId) public view returns (WunderPass memory) {
+    /** @notice Gets a WunderPass object based on its tokenId.
+      * @param tokenId The tokenId of the WunderPass.
+      * @return wunderpass A WunderPass Object.
+      */
+    function getWunderPass(uint tokenId) public view returns (WunderPass memory wunderpass) {
         require(_exists(tokenId), "This WunderPass does not exist");
         return tokenIdToWunderPass[tokenId];
     }
 
+    /** @notice Sets the URI of a WunderNFT.
+      * @dev This function gets called after the metadata was generated.
+      * @param tokenId The tokenId of the WunderNFT.
+      * @param _tokenURI The metadata URI of the WunderNFT.
+      */
     function _setTokenURI(uint256 tokenId, string memory _tokenURI) external onlyRole(ADMIN_ROLE) {
         require(_exists(tokenId), "ERC721Metadata: URI set of nonexistent token");
         _tokenURIs[tokenId] = _tokenURI;
     }
 
-    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+    /** @notice Gets the URI of a WunderNFT.
+      * @param tokenId The tokenId of the WunderNFT.
+      * @return uri The metadata URI of the WunderNFT.
+      */
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory uri) {
         require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
         return _tokenURIs[tokenId];
     }
 
-    // Modify Availability of Editions
+    /** @notice Modify Availability of Editions.
+      * @dev By increasing the editionThreshold, the availability of editions can be reenabled and vice versa.
+      * @param _newThreshold The new threshold.
+      */
     function setEditionThreshold(uint _newThreshold) external onlyRole(OWNER_ROLE) {
+        require((_newThreshold > 0) || (_newThreshold <= thresholdUpperLimit), "new threshold should be higher than zero and less or equal than thresholdUpperLimit");
         editionThreshold = _newThreshold;
     }
 
-    // Modify Public Price
-    function setPublicPrice(uint _newPrice) external onlyRole(OWNER_ROLE) {
-        // Slava: Kommentar auf MATIC beziehen bzw. zumindest ergänzend erwähnen
-        publicPrice = _newPrice * 10**15; // Always in Finney (Lowest possible Price = 0.001 ether)
+    /** @notice Modify Public Price.
+      * @param _gweiPrice The new price in gwei.
+      * @param _decimals The amount of zeros.
+      */
+    function setPublicPrice(uint _gweiPrice, uint _decimals) external onlyRole(OWNER_ROLE) {
+        require((_gweiPrice > 0), "new price should be higher than zero");
+        publicPrice = _gweiPrice * 10 ** _decimals;
     }
 
-    function activateMinting() external onlyRole(OWNER_ROLE) {
-        mintingPaused = false;
+    /** @notice Modify ChainLink fee.
+      * @dev In case ChainLink decides to change their fees.
+      * @param _gweiPrice The new price in gwei.
+      * @param _decimals The amount of zeros.
+      */
+    function setChainlinkFee(uint _gweiPrice, uint _decimals) external onlyRole(OWNER_ROLE) {
+        // Here we deliberately left out validation as we can't predict changes to the chainlink fee 
+        chainlinkFee = _gweiPrice * 10 ** _decimals;
     }
 
-    function pauseMinting() external onlyRole(OWNER_ROLE) {
-        mintingPaused = true;
+    /** @notice Modify ChainLink fee.
+      * @dev In case OpenSea decides to change their Proxy Address.
+      * @param _newAddress The new Proxy Address.
+      */
+    function setOpenSeaProxyAddress(address _newAddress) external onlyRole(OWNER_ROLE) {
+        openSeaProxyAddress = _newAddress;
     }
 
-    // Withdraw functions
+    /// @notice Pauses the minting process.
+    function pause() public onlyRole(OWNER_ROLE) whenNotPaused() {
+        _pause();
+    }
+
+    /// @notice Enables the minting process.
+    function unpause() public onlyRole(OWNER_ROLE) whenPaused() {
+        _unpause();
+    }
+
+    /// @notice Withdraws all LINK from the Contract.
     function withdrawLink() external onlyRole(OWNER_ROLE) {
         LINK.transfer(msg.sender, LINK.balanceOf(address(this)));
     }
 
+    /// @notice Withdraws all MATIC from the Contract.
     function withdrawMatic() external onlyRole(OWNER_ROLE) {
         payable(msg.sender).transfer(address(this).balance);
     }
 
-    // Role Assignments
-    // Owner can be changed
-    // Owner can assign and remove admins
-    // Owner can withdraw funds
-    // Admins can mint for users
+    /** @notice Changes the owner of the Contract.
+      * @param _newOwner The new owner of the contract.
+      */
     function changeOwner(address _newOwner) external onlyRole(OWNER_ROLE) {
         _grantRole(OWNER_ROLE, _newOwner);
         _revokeRole(OWNER_ROLE, msg.sender);
     }
 
+    /** @notice Adds a new admin that can mint for users and set metadata URIs.
+      * @param _newAdmin The new admin address.
+      */
     function addAdmin(address _newAdmin) external onlyRole(OWNER_ROLE) {
         _grantRole(ADMIN_ROLE, _newAdmin);
     }
 
+    /** @notice Removes an admin.
+      * @param _admin The admin address.
+      */
     function removeAdmin(address _admin) external onlyRole(OWNER_ROLE) {
         _revokeRole(ADMIN_ROLE, _admin);
     }
 
+    /// @notice Returns true if the sender has the OWNER_ROLE.
     function isOwner() external view returns (bool) {
         return hasRole(OWNER_ROLE, msg.sender);
     }
 
+    /// @notice Returns true if the sender has the ADMIN_ROLE.
     function isAdmin() external view returns (bool) {
         return hasRole(ADMIN_ROLE, msg.sender);
     }
 
-    function tokensOfAddress(address _owner) public view returns (uint[] memory) {
+    /** @notice Returns all WunderNFT tokenIds owned by a given address.
+      * @param _owner Any address.
+      * @return tokens An array of tokenIds that the address owns.
+      */
+    function tokensOfAddress(address _owner) public view returns (uint[] memory tokens) {
         uint count = balanceOf(_owner);
         uint[] memory ownerTokens = new uint[](count);
         if (count == 0) {
@@ -440,7 +457,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
 
         for (uint256 index = 0; index < currentTokenId(); index++) {
             if (ownerOf(index) == _owner) {
-                count = count - 1;
+                count -= 1;
                 ownerTokens[count] = index;
             }
         }
@@ -448,16 +465,20 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         return ownerTokens;
     }
 
-    function tokenIdToOwn(uint id) public view returns (address) {
-        return ownerOf(id);
-    }
-
-    function bestStatusOf(address _owner) external view returns (string memory) {
+    /** @notice Returns the best status a given address has among all their WunderNFTs.
+      * @param _owner Any address.
+      * @return status The best status of the address.
+      */
+    function bestStatusOf(address _owner) external view returns (string memory status) {
         uint[] memory ownerTokens = tokensOfAddress(_owner);
         return getWunderPass(ownerTokens[ownerTokens.length - 1]).status;
     }
 
-    function bestWonderOf(address _owner) external view returns (string memory) {
+    /** @notice Returns the best wonder a given address has among all their WunderNFTs.
+      * @param _owner Any address.
+      * @return wonder The best wonder of the address.
+      */
+    function bestWonderOf(address _owner) external view returns (string memory wonder) {
         uint[] memory ownerTokens = tokensOfAddress(_owner);
         string[] memory ownerWonders = new string[](ownerTokens.length);
 
@@ -472,5 +493,10 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
                 }
             }
         }
+
+        return "";
     }
+    /// @dev So you are still reading this Contract? You must be really passionate about Solidity and Smart Contracts!
+    /// @dev We need people like you to support us in our vision! 
+    /// @dev Just send us an email at careers@wunderpass.io with the subject: "WunderNFT Smart Contract"
 }
