@@ -298,7 +298,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         // possibleWondersRandomnessBounds = [0, 2, 6, 14, 30, 62, 126, 255]
         // availableWondersCount = 256
         
-        // Fall 2: Wunder 0, 2 und 4 sind weg
+        // Fall 2: Wunder 0, 2 und 4 sind weg. Dann sind
         // possibleWonders = [1, 3, 5, 6, 7]
         // possibleWondersRandomnessBounds = [1, 9, 41, 105, 234]
         // availableWondersCount = 235
