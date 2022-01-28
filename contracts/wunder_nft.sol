@@ -15,6 +15,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
+// Slava: Bitte nach Möglichkeiten die Funktionen zumindest mit einem Satz Kommentar versehen.
+
 contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     // Counter for Token Id
     using Counters for Counters.Counter;
@@ -94,6 +96,10 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             editions[_names[i]] = Edition(_names[i], _parents[i], 0);
         }
         
+        // SLava: Warum definiert man die patterns und die wonders innerhalb des Konstruktors und nicht außerhalb, wie die anderen Konstanten
+        // wie "mintingPaused = true"?
+        // Gleiches gilt eigentlich für wonderAllocation
+        
         patterns = ["Safari", "Bars", "Dots", "Waves", "Stones", "WunderPass", "ZigZag", "Lines", "Worms"];
        
         wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
@@ -112,6 +118,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
     * Override isApprovedForAll to auto-approve OS's proxy contract
     */
     function isApprovedForAll(address _owner, address _operator) public override view returns (bool isOperator) {
+        
+       // Slava: Sollte '0x58807baD0B376efc12F5AD86aAc70E78ed67deaE' nicht lieber als Konstante oben definiert werden? 
+       
         // if OpenSea's ERC721 Proxy Address is detected, auto-return true
         if (_operator == address(0x58807baD0B376efc12F5AD86aAc70E78ed67deaE)) {
             return true;
@@ -129,6 +138,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         mintInternal(_edition, msg.sender);
     }
 
+    // Slava: Kommentieren, dass es rauskommt
     function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
         require(mintingPaused == false, "Minting is currently paused. The next drop is coming soon!");
@@ -165,6 +175,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         return tokenIds.current();
     }
 
+    // Slava: Wir sollten hierbei Konstanten für die Werte 200, 1800, 14600 etc. benutzen und dann auch nicht 199, 1799 etc. schreiben, sondern 
+    // const_a - 1, const_b - 1 etc.
     function determineStatus() internal returns(string memory) {
         uint currentId = tokenIds.current();
         if (currentId == 199 || currentId == 1799 || currentId == 14599 || currentId == 116999 || currentId == 936199 || currentId == 7489799 || currentId == 59918599 || currentId == 479348999) {
@@ -189,6 +201,34 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
         } else {
             return "White";
         }
+        
+        
+        // Slava: Nur ne Stil-Frage, ich würde jedoch folgende Schreibweis immer bevorzugen, wenn man innerhalb eines if-Blocks return:
+//        if (currentId < 200) {
+//            return "Diamond";
+//        }         
+//        if (currentId < 1800) {
+//            return "Black";
+//        } 
+//        if (currentId < 14600) {
+//            return "Pearl";
+//        } 
+//        if (currentId < 117000) {
+//            return "Platinum";
+//        } 
+//        if (currentId < 936200) {
+//            return "Ruby";
+//        } 
+//        if (currentId < 7489800) {
+//            return "Gold";
+//        } 
+//        if (currentId < 59918600) {
+//            return "Silver";
+//        } 
+//        if (currentId < 479349000) {
+//            return "Bronze";
+//        }
+//        return "White";
     }
 
     function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory) {
@@ -202,9 +242,41 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
         }
+        
+        // Slava: Gleicher Kommentar bzgl. else-if wie oben ;)
     }
 
+//    function determineWonder(uint randomNumber) internal returns(string memory) {
+//        delete possibleWonders;
+//        uint tokenId = tokenIds.current();
+//
+//        for (uint i = 0; i < allocatedWonders.length; i++) {
+//            uint n = allocatedWonders[i] * 256 / tokenId;
+//            if (n < wonderAllocation[i]) {
+//                possibleWonders.push(i);
+//            }
+//        }
+//
+//        uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
+//        allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
+//        return wonders[wonderIndex];
+//    }
+    
+    
+    
     function determineWonder(uint randomNumber) internal returns(string memory) {
+        
+        // Dieses Array enthält die insgesamt verfügbaren (nicht aktuell noch verfügbaren) Wunder pro 256 Wunder.
+        // Dieses Array ist fast identisch mit dem wonderAllocation-Array. Evtl kann man dieses Array auch an Stelle von wonderAllocation benutzen.
+        // Wichtig hierbei ist die 129 für das letzte Wunder, damit sich die Counts der einzelnen Elemente dieses Arrays auf genau 256 summieren.
+        uint[] internal wonderCounts = [1, 2, 4, 8, 16, 32, 64, 129];
+        
+        // Dieses Array dient der Randomness
+        uint[] internal possibleWondersRandomnessBounds;
+        
+        // Counter für die Randomness-Grenzen
+        uint availableWondersCount = 0;
+        
         delete possibleWonders;
         uint tokenId = tokenIds.current();
 
@@ -212,13 +284,43 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
             uint n = allocatedWonders[i] * 256 / tokenId;
             if (n < wonderAllocation[i]) {
                 possibleWonders.push(i);
+                availableWondersCount = availableWondersCount + wonderCounts[i];
+                possibleWondersRandomnessBounds.push(availableWondersCount - 1);
             }
         }
-
-        uint wonderIndex = possibleWonders[(randomNumber % possibleWonders.length)];
-        allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
-        return wonders[wonderIndex];
+        
+        // Es ist possibleWonders.length = possibleWondersRandomnessBounds.length
+        
+        // Beispiele:
+        
+        // Fall 1: Alle Wunder sind noch verfügbar. Dann sind
+        // possibleWonders = [0, 1, 2, 3, 4, 5, 6, 7]
+        // possibleWondersRandomnessBounds = [0, 2, 6, 14, 30, 62, 126, 255]
+        // availableWondersCount = 256
+        
+        // Fall 2: Wunder 0, 2 und 4 sind weg. Dann sind
+        // possibleWonders = [1, 3, 5, 6, 7]
+        // possibleWondersRandomnessBounds = [1, 9, 41, 105, 234]
+        // availableWondersCount = 235
+        
+        // Skaliert die Random-Zahl auf die noch verfügbaren Wunder(-Wahrscheinlichkeiten)
+        // Es ist zwingend scaledRandomNumber <= 256
+        uint scaledRandomNumber = randomNumber % availableWondersCount;
+        
+        // Im Beispiel-Fall 1 liegt scaledRandomNumber zwischen 0 und 255
+        // Im Beispiel-Fall 2 liegt scaledRandomNumber zwischen 0 und 234
+        
+        // Abhängig davon zwischen welchen Grenzen scaledRandomNumber liegt, wird das passende Wunder ausgewählt.
+        // Durch die aufsteigende Verteilung innerhalb von wonderCounts haben die selteneren Wunder eine entsprechend kleinere Wahrscheinlochkeit ausgewählt zu werden
+        for (uint i = 0; i < possibleWonders.length; i++) {
+            if (scaledRandomNumber <= possibleWondersRandomnessBounds[i]) {
+                uint wonderIndex = possibleWonders[i];
+                return wonders[wonderIndex];
+            }        
+        }
     }
+    
+    
 
     function determinePattern(uint randomNumber) internal view returns(string memory) {
         uint modNumber = (randomNumber % 512) + 1;
@@ -282,6 +384,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable {
 
     // Modify Public Price
     function setPublicPrice(uint _newPrice) external onlyRole(OWNER_ROLE) {
+        // Slava: Kommentar auf MATIC beziehen bzw. zumindest ergänzend erwähnen
         publicPrice = _newPrice * 10**15; // Always in Finney (Lowest possible Price = 0.001 ether)
     }
 
