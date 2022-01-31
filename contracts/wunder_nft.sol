@@ -45,9 +45,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     address internal openSeaProxyAddress = 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE;
 
     /// @notice Declaring Variables for Price & Edition handling
-    uint public howManyMatic = 420;
-    uint public publicPrice = howManyMatic.mul(10 ** 18); // 420 MATIC
-    uint public editionThreshold = 10;
+    uint public publicPrice = 420 * 10 ** 18; // 420 MATIC
+    uint public editionThreshold = 100;
     uint public thresholdUpperLimit = 1000;
     mapping(string => Edition) editions;
     struct Edition {
@@ -79,7 +78,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     string[] statusArray = ["Diamond", "Black", "Pearl", "Platinum", "Ruby", "Gold", "Silver", "Bronze", "White"];
     uint[] statusLimits = [200, 1800, 14600, 117000, 936200, 7489800, 59918600, 479349000, 3834792200];
     
-    string[] patterns = ["Safari Fun", "Triangular Bars", "Pointillism", "Wavy waves", "Stony desert", "WunderPass", "Zigzag", "Linear", "Curves"];
+    string[] patterns = ["Curves", "Linear", "Zigzag", "WunderPass", "Stony desert", "Wavy waves", "Pointillism", "Triangular Bars", "Safari Fun"];
 
     string[] wonders = ["Pyramids of Giza", "Great Wall of China", "Petra", "Colosseum", "Chichen Itza", "Machu Picchu", "Taj Mahal", "Christ the Redeemer"];
     uint[] allocatedWonders = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -148,20 +147,20 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         mintInternal(_edition, msg.sender);
     }
 
-    //  ___   _  _______  ___   __    _    _______  _______  ______    _______  _______  _______ 
-    // |   | | ||       ||   | |  |  | |  |       ||       ||    _ |  |       ||       ||       |
-    // |   |_| ||    ___||   | |   |_| |  |  _____||_     _||   | ||  |    ___||  _____||  _____|
-    // |      _||   |___ |   | |       |  | |_____   |   |  |   |_||_ |   |___ | |_____ | |_____ 
-    // |     |_ |    ___||   | |  _    |  |_____  |  |   |  |    __  ||    ___||_____  ||_____  |
-    // |    _  ||   |___ |   | | | |   |   _____| |  |   |  |   |  | ||   |___  _____| | _____| |
-    // |___| |_||_______||___| |_|  |__|  |_______|  |___|  |___|  |_||_______||_______||_______|
-    //  ___   _  _______  __   __  __   __  _______    ______    _______  __   __  _______       
-    // |   | | ||       ||  |_|  ||  |_|  ||       |  |    _ |  |   _   ||  | |  ||       |      
-    // |   |_| ||   _   ||       ||       ||_     _|  |   | ||  |  |_|  ||  | |  ||  _____|      
-    // |      _||  | |  ||       ||       |  |   |    |   |_||_ |       ||  |_|  || |_____       
-    // |     |_ |  |_|  ||       ||       |  |   |    |    __  ||       ||       ||_____  |      
-    // |    _  ||       || ||_|| || ||_|| |  |   |    |   |  | ||   _   ||       | _____| |      
-    // |___| |_||_______||_|   |_||_|   |_|  |___|    |___|  |_||__| |__||_______||_______|      
+    //  ___   _  _______  ___   __    _         _______  _______  ______    _______  _______  _______ 
+    // |   | | ||       ||   | |  |  | |       |       ||       ||    _ |  |       ||       ||       |
+    // |   |_| ||    ___||   | |   |_| |       |  _____||_     _||   | ||  |    ___||  _____||  _____|
+    // |      _||   |___ |   | |       |       | |_____   |   |  |   |_||_ |   |___ | |_____ | |_____ 
+    // |     |_ |    ___||   | |  _    |       |_____  |  |   |  |    __  ||    ___||_____  ||_____  |
+    // |    _  ||   |___ |   | | | |   |        _____| |  |   |  |   |  | ||   |___  _____| | _____| |
+    // |___| |_||_______||___| |_|  |__|       |_______|  |___|  |___|  |_||_______||_______||_______|
+    //  ___   _  _______  __   __  __   __  _______         ______    _______  __   __  _______       
+    // |   | | ||       ||  |_|  ||  |_|  ||       |       |    _ |  |   _   ||  | |  ||       |      
+    // |   |_| ||   _   ||       ||       ||_     _|       |   | ||  |  |_|  ||  | |  ||  _____|      
+    // |      _||  | |  ||       ||       |  |   |         |   |_||_ |       ||  |_|  || |_____       
+    // |     |_ |  |_|  ||       ||       |  |   |         |    __  ||       ||       ||_____  |      
+    // |    _  ||       || ||_|| || ||_|| |  |   |         |   |  | ||   _   ||       | _____| |      
+    // |___| |_||_______||_|   |_||_|   |_|  |___|         |___|  |_||__| |__||_______||_______|      
     function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) whenNotPaused() {
         require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
         address owner = _owner;
@@ -236,8 +235,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
         }
+<<<<<<< Updated upstream
         if (_desiredEdition.counter >= (editionThreshold.mul(_thresholdMultiplier))) {
             return determineEdition(_desiredEdition.parent, (editionStepMultiplier.mul(_thresholdMultiplier)));
+=======
+        if (_desiredEdition.counter >= (editionThreshold * _thresholdMultiplier)) {
+            return determineEdition(_desiredEdition.parent, (100 * _thresholdMultiplier));
+>>>>>>> Stashed changes
         }
         _desiredEdition.counter += 1;
         return _desiredEdition.name;

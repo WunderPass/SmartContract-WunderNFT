@@ -29,7 +29,7 @@ npx hardhat run scripts/deploy.js --network polygon
 - Etherscan: https://rinkeby.etherscan.io/address/0x425d2219e7a32fc813c70d497a4405a8432542ca
 
 ## Mumbai
-- Contract Address: ```0x8E6e4c07090c3Cc0Bd97ef18fAb223D8c0643790```
+- Contract Address: ```0x50b0D35d9eFC3Aa81825A2fCCE81cF60C0decae6```
 
 ## Polygon
 TBA
