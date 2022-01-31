@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-// ██╗    ██╗██╗   ██╗███╗   ██╗██████╗ ███████╗██████╗ ███╗   ██╗███████╗████████╗
-// ██║    ██║██║   ██║████╗  ██║██╔══██╗██╔════╝██╔══██╗████╗  ██║██╔════╝╚══██╔══╝
-// ██║ █╗ ██║██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝██╔██╗ ██║█████╗     ██║   
-// ██║███╗██║██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗██║╚██╗██║██╔══╝     ██║   
-// ╚███╔███╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║██║ ╚████║██║        ██║   
-//  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝        ╚═╝   
+
+// ██╗    ██╗██╗   ██╗███╗   ██╗██████╗ ███████╗██████╗   ██████╗  █████╗ ███████╗███████╗
+// ██║    ██║██║   ██║████╗  ██║██╔══██╗██╔════╝██╔══██╗  ██╔══██╗██╔══██╗██╔════╝██╔════╝
+// ██║ █╗ ██║██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝  ██████╔╝███████║███████╗███████╗
+// ██║███╗██║██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗  ██╔═══╝ ██╔══██║╚════██║╚════██║
+// ╚███╔███╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║  ██║     ██║  ██║███████║███████║
+//  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝
 
 pragma solidity ^0.8.9;
 
@@ -30,9 +31,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
 
     /// @notice Declaring Variables for Random Number Generation
     uint256 internal chainlinkFee = 0.0001 * 10 ** 18; // 0.0001 LINK 
-    bytes32 internal keyHash;
-    address internal VRFCoordinator;
-    address internal linkToken;
+    bytes32 internal keyHash = 0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
+    address internal VRFCoordinator = 0x8C7382F9D8f56b33781fE506E897a4F1e2d17255;
+    address internal linkToken = 0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
 
     /// @notice OpenSea Whitelist Address
     address internal openSeaProxyAddress = 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE;
@@ -51,10 +52,12 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     /// @notice Declaring Variables for NFT Mapping
     /// @dev mapping of requestId to tokenId
     mapping(bytes32 => uint) requestIdToTokenId;
-    /// @dev mapping of tokenId to WunderPass
-    mapping(uint => WunderPass) tokenIdToWunderPass;
     /// @dev mapping of tokenId to tokenUri
     mapping (uint => string) private _tokenURIs;
+    /// @dev mapping of address to tokenIds
+    mapping (address => uint[]) private addressToTokenIds;
+    /// @dev mapping of tokenId to WunderPass
+    mapping(uint => WunderPass) tokenIdToWunderPass;
 
     struct WunderPass {
         address owner;
@@ -83,25 +86,12 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     event WunderPassMinted(uint indexed tokenId, address indexed owner, string status, string pattern, string wonder, string edition);
 
     /** @notice Initializes the contract.
-      * @dev Sets up the editions mapping and grants the deployer OWNER_ROLE and ADMIN_ROLE
-      * @param _names All possible editions.
-      * @param _parents All parents of the editions.
-      * @param _keyHash The keyHash of ChainLink.
-      * @param _VRFCoordinator The VRFCoordinator address of ChainLink.
-      * @param _linkToken The LINK Token address.
+      * @dev Grants the deployer OWNER_ROLE and ADMIN_ROLE
       */
-    constructor(string[] memory _names, string[] memory _parents, bytes32 _keyHash, address _VRFCoordinator, address _linkToken) 
+    constructor() 
         VRFConsumerBase(VRFCoordinator, linkToken)
-        ERC721("WunderPassNFT", "WPN")
-    {
-        for (uint i = 0; i < _names.length; i++) {
-            editions[_names[i]] = Edition(_names[i], _parents[i], 0);
-        }
-
-        keyHash = _keyHash;
-        VRFCoordinator = _VRFCoordinator;
-        linkToken = _linkToken;
-        
+        ERC721("WunderPass", "WP")
+    {   
         _grantRole(OWNER_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
     }
@@ -119,6 +109,18 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
             return true;
         }
         return ERC721.isApprovedForAll(_owner, _operator);
+    }
+
+    /** @notice Sets new editions for the WunderNFT.
+      * @param _names All possible editions.
+      * @param _parents All parents of the editions.
+      */
+    function extendEditions(string[] memory _names, string[] memory _parents) external onlyRole(OWNER_ROLE) {
+        for (uint i = 0; i < _names.length; i++) {
+            if (bytes(editions[_names[i]].name).length == 0) {
+                editions[_names[i]] = Edition(_names[i], _parents[i], 0);
+            }
+        }
     }
 
     /** @notice Mints a WunderNFT for a given address.
@@ -449,20 +451,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       * @return tokens An array of tokenIds that the address owns.
       */
     function tokensOfAddress(address _owner) public view returns (uint[] memory tokens) {
-        uint count = balanceOf(_owner);
-        uint[] memory ownerTokens = new uint[](count);
-        if (count == 0) {
-            return ownerTokens;
-        }
-
-        for (uint256 index = 0; index < currentTokenId(); index++) {
-            if (ownerOf(index) == _owner) {
-                count -= 1;
-                ownerTokens[count] = index;
-            }
-        }
-
-        return ownerTokens;
+        return addressToTokenIds[_owner];
     }
 
     /** @notice Returns the best status a given address has among all their WunderNFTs.
@@ -471,7 +460,21 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       */
     function bestStatusOf(address _owner) external view returns (string memory status) {
         uint[] memory ownerTokens = tokensOfAddress(_owner);
-        return getWunderPass(ownerTokens[ownerTokens.length - 1]).status;
+        string[] memory ownerStatus = new string[](ownerTokens.length);
+
+        for (uint256 index = 0; index < ownerTokens.length; index++) {
+            ownerStatus[index] = getWunderPass(ownerTokens[index]).status;
+        }
+
+        for (uint256 statusInd = 0; statusInd < statusArray.length; statusInd++) {
+            for (uint256 index = 0; index < ownerStatus.length; index++) {
+                if (keccak256(abi.encodePacked(statusArray[statusInd])) == keccak256(abi.encodePacked(ownerStatus[index]))) {
+                    return statusArray[statusInd];
+                }
+            }
+        }
+
+        return "";
     }
 
     /** @notice Returns the best wonder a given address has among all their WunderNFTs.
@@ -496,6 +499,30 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
 
         return "";
     }
+
+    /** @notice ERC721 Hook that gets called before every transfer/mint.
+      * @dev Here we use this hook to update the addressToTokenIds mapping to keep track of NFT ownership.
+      * @param from Sender of the token.
+      * @param to Receiver of the token.
+      * @param tokenId The tokenId of the transferred token.
+      */
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
+        super._beforeTokenTransfer(from, to, tokenId);
+
+        if (addressToTokenIds[from].length > 0) {
+            uint tokenIndex = 0;
+            
+            while (addressToTokenIds[from][tokenIndex] != tokenId) {
+                tokenIndex++;
+            }
+
+            addressToTokenIds[from][tokenIndex] = addressToTokenIds[from][addressToTokenIds[from].length - 1];
+            addressToTokenIds[from].pop();
+        }
+
+        addressToTokenIds[to].push(tokenId);
+    }
+
     /// @dev So you are still reading this Contract? You must be really passionate about Solidity and Smart Contracts!
     /// @dev We need people like you to support us in our vision! 
     /// @dev Just send us an email at careers@wunderpass.io with the subject: "WunderNFT Smart Contract"

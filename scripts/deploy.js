@@ -1,8 +1,5 @@
 const fs = require('fs');
 
-const names = ["Berlin", "Düsseldorf", "London", "Oxford", "NewYork", "LosAngeles", "Shanghai", "Peking", "Deutschland", "England", "USA", "China", "Europa", "Nordamerika", "Asien", "Welt"]
-const parents = ["Deutschland", "Deutschland", "England", "England", "USA", "USA", "China", "China", "Europa", "Europa", "Nordamerika", "Asien", "Welt", "Welt", "Welt", "Welt"]
-
 // Mumbai
 const keyHash = '0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4';
 const VRFCoordinator = '0x8C7382F9D8f56b33781fE506E897a4F1e2d17255';
@@ -21,7 +18,7 @@ async function main() {
   console.log(`Account balance: ${balance.toString()}`);
 
   const WunderNFT = await ethers.getContractFactory('WunderNFT');
-  const contract = await WunderNFT.deploy(names, parents, keyHash, VRFCoordinator, linkToken);
+  const contract = await WunderNFT.deploy();
   console.log(`Token address: ${contract.address}`);
 
   const contractData = {
