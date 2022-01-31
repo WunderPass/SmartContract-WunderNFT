@@ -16,20 +16,26 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "./external/WunderSafeMath.sol";
 
 /** @title WunderNFT 
   * @author The WunderPass Team
 */
 contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable {
+    
+    /// @notice WunderSafeMath used for mul, div, add, sub, mod
+    using WunderSafeMath for uint256;    
+
     /// @notice Counter used for tokenIds
     using Counters for Counters.Counter;
     Counters.Counter private tokenIds;
-
+    
     /// @notice Defining roles used by Access Control
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     /// @notice Declaring Variables for Random Number Generation
+    
     uint256 internal chainlinkFee = 0.0001 * 10 ** 18; // 0.0001 LINK 
     bytes32 internal keyHash = 0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
     address internal VRFCoordinator = 0x8C7382F9D8f56b33781fE506E897a4F1e2d17255;
@@ -39,7 +45,8 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     address internal openSeaProxyAddress = 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE;
 
     /// @notice Declaring Variables for Price & Edition handling
-    uint public publicPrice = 420 * 10 ** 18; // 420 MATIC
+    uint public howManyMatic = 420;
+    uint public publicPrice = howManyMatic.mul(10 ** 18); // 420 MATIC
     uint public editionThreshold = 10;
     uint public thresholdUpperLimit = 1000;
     mapping(string => Edition) editions;
@@ -204,7 +211,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     function determineStatus() internal returns(string memory status) {
         uint currentId = tokenIds.current();
         for (uint256 index = 0; index < statusArray.length; index++) {
-            if (currentId == (statusLimits[index] - 1)) {
+            if (currentId == (statusLimits[index].sub(1))) {
                 _pause();
             }
             if (currentId < statusLimits[index]) {
@@ -223,13 +230,14 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       * @return edition The edition of the WunderNFT.
       */
     function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory edition) {
+        uint editionStepMultiplier = 10;
         Edition storage _desiredEdition = editions[_edition];
         if (keccak256(abi.encodePacked(_desiredEdition.name)) == keccak256(abi.encodePacked(_desiredEdition.parent))) {
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
         }
-        if (_desiredEdition.counter >= (editionThreshold * _thresholdMultiplier)) {
-            return determineEdition(_desiredEdition.parent, (10 * _thresholdMultiplier));
+        if (_desiredEdition.counter >= (editionThreshold.mul(_thresholdMultiplier))) {
+            return determineEdition(_desiredEdition.parent, (editionStepMultiplier.mul(_thresholdMultiplier)));
         }
         _desiredEdition.counter += 1;
         return _desiredEdition.name;
@@ -246,27 +254,28 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         delete possibleWonders;
 
         uint tokenId = tokenIds.current();
+        uint XFactor = 256;
 
         for (uint i = 0; i < allocatedWonders.length; i++) {
-            uint n = allocatedWonders[i] * 256 / tokenId;
+            uint n = XFactor.mul(allocatedWonders[i]).div( tokenId);
             if (n < wonderAllocation[i]) {
                 possibleWonders.push(i);
-                availableWondersCount = availableWondersCount + wonderAllocation[i];
-                possibleWondersRandomnessBounds.push(availableWondersCount - 1);
+                availableWondersCount = availableWondersCount.add(wonderAllocation[i]);
+                possibleWondersRandomnessBounds.push(availableWondersCount.sub(1));
             }
         }
         
-        uint scaledRandomNumber = randomNumber % availableWondersCount;
+        uint scaledRandomNumber = randomNumber.mod(availableWondersCount);
         
         for (uint i = 0; i < possibleWonders.length; i++) {
             if (scaledRandomNumber <= possibleWondersRandomnessBounds[i]) {
                 uint wonderIndex = possibleWonders[i];
-                allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex] + 1;
+                allocatedWonders[wonderIndex] = allocatedWonders[wonderIndex].add(1);
                 return wonders[wonderIndex];
             }        
         }
 
-        return wonders[wonders.length - 1];
+        return wonders[wonders.length.sub(1)];
     }
 
     /** @notice Determines the pattern of a WunderNFT based on randomness.
@@ -275,10 +284,12 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       * @return pattern The pattern of the WunderNFT.
       */
     function determinePattern(uint randomNumber) internal view returns(string memory pattern) {
-        uint modNumber = (randomNumber % 512) + 1;
+        /// @notice number of wundernft where the rarest pattern occurs once
+        uint256 patternModNumber = 512;
+        uint256 modNumber = randomNumber.mod(patternModNumber).add(1);
 
         for (uint i = 0; i < patterns.length; i++) {
-            if (modNumber >= 512 / (2 ** (i + 1))) {
+            if (modNumber >= patternModNumber.div(2 ** (i.add(1)))) {
                 return patterns[i];
             }
         }
@@ -373,7 +384,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       */
     function setPublicPrice(uint _gweiPrice, uint _decimals) external onlyRole(OWNER_ROLE) {
         require((_gweiPrice > 0), "new price should be higher than zero");
-        publicPrice = _gweiPrice * 10 ** _decimals;
+        publicPrice = _gweiPrice.mul(10 ** _decimals);
     }
 
     /** @notice Modify ChainLink fee.
@@ -383,7 +394,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       */
     function setChainlinkFee(uint _gweiPrice, uint _decimals) external onlyRole(OWNER_ROLE) {
         // Here we deliberately left out validation as we can't predict changes to the chainlink fee 
-        chainlinkFee = _gweiPrice * 10 ** _decimals;
+        chainlinkFee = _gweiPrice.mul(10 ** _decimals);
     }
 
     /** @notice Modify ChainLink fee.
@@ -516,7 +527,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
                 tokenIndex++;
             }
 
-            addressToTokenIds[from][tokenIndex] = addressToTokenIds[from][addressToTokenIds[from].length - 1];
+            addressToTokenIds[from][tokenIndex] = addressToTokenIds[from][addressToTokenIds[from].length.sub(1)];
             addressToTokenIds[from].pop();
         }
 
