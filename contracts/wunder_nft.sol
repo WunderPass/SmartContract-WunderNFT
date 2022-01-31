@@ -229,19 +229,14 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       * @return edition The edition of the WunderNFT.
       */
     function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory edition) {
-        uint editionStepMultiplier = 10;
+        uint editionStepMultiplier = 100;
         Edition storage _desiredEdition = editions[_edition];
         if (keccak256(abi.encodePacked(_desiredEdition.name)) == keccak256(abi.encodePacked(_desiredEdition.parent))) {
             _desiredEdition.counter += 1;
             return _desiredEdition.name;
         }
-<<<<<<< Updated upstream
         if (_desiredEdition.counter >= (editionThreshold.mul(_thresholdMultiplier))) {
             return determineEdition(_desiredEdition.parent, (editionStepMultiplier.mul(_thresholdMultiplier)));
-=======
-        if (_desiredEdition.counter >= (editionThreshold * _thresholdMultiplier)) {
-            return determineEdition(_desiredEdition.parent, (100 * _thresholdMultiplier));
->>>>>>> Stashed changes
         }
         _desiredEdition.counter += 1;
         return _desiredEdition.name;
