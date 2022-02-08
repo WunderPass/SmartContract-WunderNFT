@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-
-// ██╗    ██╗██╗   ██╗███╗   ██╗██████╗ ███████╗██████╗   ██████╗  █████╗ ███████╗███████╗
-// ██║    ██║██║   ██║████╗  ██║██╔══██╗██╔════╝██╔══██╗  ██╔══██╗██╔══██╗██╔════╝██╔════╝
-// ██║ █╗ ██║██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝  ██████╔╝███████║███████╗███████╗
-// ██║███╗██║██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗  ██╔═══╝ ██╔══██║╚════██║╚════██║
-// ╚███╔███╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║  ██║     ██║  ██║███████║███████║
-//  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝
+// ██╗    ██╗██╗   ██╗███╗   ██╗██████╗ ███████╗██████╗  ██████╗  █████╗ ███████╗███████╗
+// ██║    ██║██║   ██║████╗  ██║██╔══██╗██╔════╝██╔══██╗ ██╔══██╗██╔══██╗██╔════╝██╔════╝
+// ██║ █╗ ██║██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝ ██████╔╝███████║███████╗███████╗
+// ██║███╗██║██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗ ██╔═══╝ ██╔══██║╚════██║╚════██║
+// ╚███╔███╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║ ██║     ██║  ██║███████║███████║
+//  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝
 
 pragma solidity ^0.8.9;
 
@@ -18,10 +17,10 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "./external/WunderSafeMath.sol";
 
-/** @title WunderNFT 
+/** @title WunderPass 
   * @author The WunderPass Team
 */
-contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable {
+contract WunderPass is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable {
     
     /// @notice WunderSafeMath used for mul, div, add, sub, mod
     using WunderSafeMath for uint256;    
@@ -35,11 +34,10 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     /// @notice Declaring Variables for Random Number Generation
-    
     uint256 internal chainlinkFee = 0.0001 * 10 ** 18; // 0.0001 LINK 
-    bytes32 internal keyHash = 0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
-    address internal VRFCoordinator = 0x8C7382F9D8f56b33781fE506E897a4F1e2d17255;
-    address internal linkToken = 0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
+    bytes32 internal keyHash = 0xf86195cf7690c55907b2b611ebb7343a6f649bff128701cc542f0569e2c549da;
+    address internal VRFCoordinator = 0x3d2341ADb2D31f1c5530cDC622016af293177AE0;
+    address internal linkToken = 0xb0897686c545045aFc77CF20eC7A532E3120E0F1;
 
     /// @notice OpenSea Whitelist Address
     address internal openSeaProxyAddress = 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE;
@@ -63,9 +61,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
     /// @dev mapping of address to tokenIds
     mapping (address => uint[]) private addressToTokenIds;
     /// @dev mapping of tokenId to WunderPass
-    mapping(uint => WunderPass) tokenIdToWunderPass;
+    mapping(uint => WunderPassProps) tokenIdToWunderPassProps;
 
-    struct WunderPass {
+    struct WunderPassProps {
         address owner;
         uint tokenId;
         string status;
@@ -117,7 +115,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return ERC721.isApprovedForAll(_owner, _operator);
     }
 
-    /** @notice Sets new editions for the WunderNFT.
+    /** @notice Sets new editions for the WunderPass.
       * @param _names All possible editions.
       * @param _parents All parents of the editions.
       */
@@ -129,53 +127,22 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         }
     }
 
-    /** @notice Mints a WunderNFT for a given address.
+    /** @notice Mints a WunderPass for a given address.
       * @dev Only callable by an ADMIN account.
       * @param _edition The edition, a user requested.
-      * @param _owner The address of a user who will be the owner of the WunderNFT.
+      * @param _owner The address of a user who will be the owner of the WunderPass.
       */
     function mintForUser(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) {
         mintInternal(_edition, _owner);
     }
 
-    /** @notice Mints a WunderNFT.
+    /** @notice Mints a WunderPass.
       * @dev This is the public mint function.
       * @param _edition The edition, a user requested.
       */
     function mint(string memory _edition) public payable {
         require(msg.value >= publicPrice);
         mintInternal(_edition, msg.sender);
-    }
-
-    //  ___   _  _______  ___   __    _         _______  _______  ______    _______  _______  _______ 
-    // |   | | ||       ||   | |  |  | |       |       ||       ||    _ |  |       ||       ||       |
-    // |   |_| ||    ___||   | |   |_| |       |  _____||_     _||   | ||  |    ___||  _____||  _____|
-    // |      _||   |___ |   | |       |       | |_____   |   |  |   |_||_ |   |___ | |_____ | |_____ 
-    // |     |_ |    ___||   | |  _    |       |_____  |  |   |  |    __  ||    ___||_____  ||_____  |
-    // |    _  ||   |___ |   | | | |   |        _____| |  |   |  |   |  | ||   |___  _____| | _____| |
-    // |___| |_||_______||___| |_|  |__|       |_______|  |___|  |___|  |_||_______||_______||_______|
-    //  ___   _  _______  __   __  __   __  _______         ______    _______  __   __  _______       
-    // |   | | ||       ||  |_|  ||  |_|  ||       |       |    _ |  |   _   ||  | |  ||       |      
-    // |   |_| ||   _   ||       ||       ||_     _|       |   | ||  |  |_|  ||  | |  ||  _____|      
-    // |      _||  | |  ||       ||       |  |   |         |   |_||_ |       ||  |_|  || |_____       
-    // |     |_ |  |_|  ||       ||       |  |   |         |    __  ||       ||       ||_____  |      
-    // |    _  ||       || ||_|| || ||_|| |  |   |         |   |  | ||   _   ||       | _____| |      
-    // |___| |_||_______||_|   |_||_|   |_|  |___|         |___|  |_||__| |__||_______||_______|      
-    function mintTest(string memory _edition, address _owner) public onlyRole(ADMIN_ROLE) whenNotPaused() {
-        require(bytes(editions[_edition].name).length > 0, "Cant mint NFT without valid edition");
-        address owner = _owner;
-        string memory _statusProp = determineStatus();
-        string memory _editionProp = determineEdition(_edition, 1);
-        uint tokenId = tokenIds.current();
-
-        bytes32 requestId = bytes32(tokenId);
-        WunderPass memory wunderPass = WunderPass(owner, tokenId, _statusProp, _editionProp, "", "");
-        requestIdToTokenId[requestId] = tokenId;
-        tokenIdToWunderPass[tokenId] = wunderPass;
-        _mint(owner, tokenId);
-        tokenIds.increment();
-
-        fulfillRandomness(requestId, uint256(keccak256(abi.encode(tokenId, 1, _edition))));
     }
 
     /** @notice The internal mint function that gets called by mintForUser and mint.
@@ -189,9 +156,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         string memory _editionProp = determineEdition(_edition, 1);
         uint tokenId = tokenIds.current();
         bytes32 requestId = getRandomNumber();
-        WunderPass memory wunderPass = WunderPass(_owner, tokenId, _statusProp, _editionProp, "", "");
+        WunderPassProps memory wunderPassProps = WunderPassProps(_owner, tokenId, _statusProp, _editionProp, "", "");
         requestIdToTokenId[requestId] = tokenId;
-        tokenIdToWunderPass[tokenId] = wunderPass;
+        tokenIdToWunderPassProps[tokenId] = wunderPassProps;
         _mint(_owner, tokenId);
         tokenIds.increment();
     }
@@ -203,9 +170,9 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return tokenIds.current();
     }
 
-    /** @notice Determines the status of a WunderNFT based on its tokenId.
-      * @dev The first 200 WunderNFTs will have a Diamond status. The next 1600 WunderNFTs will have a Black status etc.
-      * @return status The status of the WunderNFT.
+    /** @notice Determines the status of a WunderPass based on its tokenId.
+      * @dev The first 200 WunderPasses will have a Diamond status. The next 1600 WunderPasses will have a Black status etc.
+      * @return status The status of the WunderPass.
       */
     function determineStatus() internal returns(string memory status) {
         uint currentId = tokenIds.current();
@@ -220,13 +187,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return "White";
     }
 
-    /** @notice Determines the edition of a WunderNFT based on the requested edition.
-      * @dev Editions are limited and if the requested edition is not available anymore, the WunderNFT will get the parent edition etc.
+    /** @notice Determines the edition of a WunderPass based on the requested edition.
+      * @dev Editions are limited and if the requested edition is not available anymore, the WunderPass will get the parent edition etc.
       * @dev The editions follow a geographical structure, i.e. World is the parent edition of Europe which is the parent edition of Germany which is the parent edition of Berlin.
       * @dev The World edition is not limited.
       * @param _edition The desired edition.
       * @param _thresholdMultiplier A multiplier that increases with every call. Hence, Europe can be issued more often than Germany which can be issued more often than Berlin etc.
-      * @return edition The edition of the WunderNFT.
+      * @return edition The edition of the WunderPass.
       */
     function determineEdition(string memory _edition, uint _thresholdMultiplier) internal returns(string memory edition) {
         uint editionStepMultiplier = 100;
@@ -242,10 +209,10 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return _desiredEdition.name;
     }
     
-    /** @notice Determines the wonder of a WunderNFT based on randomness and previously issued wonders.
+    /** @notice Determines the wonder of a WunderPass based on randomness and previously issued wonders.
       * @dev For more information on how the wonders are generated, see section 'NFT-Pass' in the White Paper: https://github.com/WunderPass/White-Paper
       * @param randomNumber A random number generated by chainLink.
-      * @return wonder The wonder of the WunderNFT.
+      * @return wonder The wonder of the WunderPass.
       */
     function determineWonder(uint randomNumber) internal returns(string memory wonder) {
         uint availableWondersCount = 0;
@@ -277,13 +244,13 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return wonders[wonders.length.sub(1)];
     }
 
-    /** @notice Determines the pattern of a WunderNFT based on randomness.
+    /** @notice Determines the pattern of a WunderPass based on randomness.
       * @dev The distribution of patterns is skewed so that the probabilities of the patterns are 1/2, 1/4, 1/8, 1/16 etc.
       * @param randomNumber A random number generated by chainLink.
-      * @return pattern The pattern of the WunderNFT.
+      * @return pattern The pattern of the WunderPass.
       */
     function determinePattern(uint randomNumber) internal view returns(string memory pattern) {
-        /// @notice number of wundernft where the rarest pattern occurs once
+        /// @notice number of WunderPass where the rarest pattern occurs once
         uint256 patternModNumber = 512;
         uint256 modNumber = randomNumber.mod(patternModNumber).add(1);
 
@@ -319,14 +286,14 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
       */
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
         uint tokenId = requestIdToTokenId[requestId];
-        WunderPass storage wunderPass = tokenIdToWunderPass[tokenId];
+        WunderPassProps storage wunderPassProps = tokenIdToWunderPassProps[tokenId];
         (uint randOne, uint randTwo) = twoFromOne(randomness);
         string memory pattern = determinePattern(randOne);
         string memory wonder = determineWonder(randTwo);
-        wunderPass.pattern = pattern;
-        wunderPass.wonder = wonder;
+        wunderPassProps.pattern = pattern;
+        wunderPassProps.wonder = wonder;
         address owner = ownerOf(tokenId);
-        emit WunderPassMinted(tokenId, owner, wunderPass.status, pattern, wonder, wunderPass.edition);
+        emit WunderPassMinted(tokenId, owner, wunderPassProps.status, pattern, wonder, wunderPassProps.edition);
     }
 
     /** @notice Get two random numbers from one.
@@ -342,26 +309,26 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
 
     /** @notice Gets a WunderPass object based on its tokenId.
       * @param tokenId The tokenId of the WunderPass.
-      * @return wunderpass A WunderPass Object.
+      * @return wunderPassProps A WunderPass Object.
       */
-    function getWunderPass(uint tokenId) public view returns (WunderPass memory wunderpass) {
+    function getWunderPass(uint tokenId) public view returns (WunderPassProps memory wunderPassProps) {
         require(_exists(tokenId), "This WunderPass does not exist");
-        return tokenIdToWunderPass[tokenId];
+        return tokenIdToWunderPassProps[tokenId];
     }
 
-    /** @notice Sets the URI of a WunderNFT.
+    /** @notice Sets the URI of a WunderPass.
       * @dev This function gets called after the metadata was generated.
-      * @param tokenId The tokenId of the WunderNFT.
-      * @param _tokenURI The metadata URI of the WunderNFT.
+      * @param tokenId The tokenId of the WunderPass.
+      * @param _tokenURI The metadata URI of the WunderPass.
       */
     function _setTokenURI(uint256 tokenId, string memory _tokenURI) external onlyRole(ADMIN_ROLE) {
         require(_exists(tokenId), "ERC721Metadata: URI set of nonexistent token");
         _tokenURIs[tokenId] = _tokenURI;
     }
 
-    /** @notice Gets the URI of a WunderNFT.
-      * @param tokenId The tokenId of the WunderNFT.
-      * @return uri The metadata URI of the WunderNFT.
+    /** @notice Gets the URI of a WunderPass.
+      * @param tokenId The tokenId of the WunderPass.
+      * @return uri The metadata URI of the WunderPass.
       */
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory uri) {
         require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
@@ -456,7 +423,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return hasRole(ADMIN_ROLE, msg.sender);
     }
 
-    /** @notice Returns all WunderNFT tokenIds owned by a given address.
+    /** @notice Returns all WunderPass tokenIds owned by a given address.
       * @param _owner Any address.
       * @return tokens An array of tokenIds that the address owns.
       */
@@ -464,7 +431,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return addressToTokenIds[_owner];
     }
 
-    /** @notice Returns the best status a given address has among all their WunderNFTs.
+    /** @notice Returns the best status a given address has among all their WunderPasses.
       * @param _owner Any address.
       * @return status The best status of the address.
       */
@@ -487,7 +454,7 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
         return "";
     }
 
-    /** @notice Returns the best wonder a given address has among all their WunderNFTs.
+    /** @notice Returns the best wonder a given address has among all their WunderPasses.
       * @param _owner Any address.
       * @return wonder The best wonder of the address.
       */
@@ -535,5 +502,5 @@ contract WunderNFT is ERC721, VRFConsumerBase, AccessControl, Ownable, Pausable 
 
     /// @dev So you are still reading this Contract? You must be really passionate about Solidity and Smart Contracts!
     /// @dev We need people like you to support us in our vision! 
-    /// @dev Just send us an email at careers@wunderpass.io with the subject: "WunderNFT Smart Contract"
+    /// @dev Just send us an email at careers@wunderpass.io with the subject: "WunderPass Smart Contract"
 }

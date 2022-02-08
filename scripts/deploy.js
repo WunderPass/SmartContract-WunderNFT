@@ -17,8 +17,8 @@ async function main() {
   const balance = await deployer.getBalance();
   console.log(`Account balance: ${balance.toString()}`);
 
-  const WunderNFT = await ethers.getContractFactory('WunderNFT');
-  const contract = await WunderNFT.deploy();
+  const WunderPass = await ethers.getContractFactory('WunderPass');
+  const contract = await WunderPass.deploy();
   console.log(`Token address: ${contract.address}`);
 
   const contractData = {
@@ -26,7 +26,7 @@ async function main() {
     abi: contract.interface.format('full')
   }
 
-  fs.writeFileSync('deployed/WunderNFT.json', JSON.stringify(contractData));
+  fs.writeFileSync('deployed/WunderPass.json', JSON.stringify(contractData));
 }
 
 main()

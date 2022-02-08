@@ -20,11 +20,11 @@ function wunderPassToJson(wunderpass) {
 }
 
 describe('WUNDER NFT CONTRACT', () => {
-  let WunderNft, contract, owner, user1, user2;
+  let WunderPass, contract, owner, user1, user2;
 
   beforeEach(async () => {
-    WunderNft = await ethers.getContractFactory('WunderNFT');
-    contract = await WunderNft.deploy();
+    WunderPass = await ethers.getContractFactory('WunderPass');
+    contract = await WunderPass.deploy();
     await contract.extendEditions(names, parents);
 
     [owner, user1, user2, _] = await ethers.getSigners();
@@ -72,7 +72,7 @@ describe('WUNDER NFT CONTRACT', () => {
       await contract.connect(owner).changeOwner(user1.address);
 
       await expect(contract.setEditionThreshold(20)).to.be.reverted;
-      expect(await contract.editionThreshold()).to.equal(10);
+      expect(await contract.editionThreshold()).to.equal(100);
 
       await contract.connect(user1).setEditionThreshold(20);
       expect(await contract.editionThreshold()).to.equal(20);
@@ -136,29 +136,15 @@ describe('WUNDER NFT CONTRACT', () => {
       await contract.mintTest('Berlin // DE // EU', user1.address)
       expect(wunderPassToJson(await contract.getWunderPass(0)).edition).to.equal('Berlin // DE // EU')
       
-      for(var i = 1; i < 11; i++) {
+      for(var i = 1; i < 101; i++) {
         await contract.mintTest('Berlin // DE // EU', user1.address)
         expect(wunderPassToJson(await contract.getWunderPass(i)).edition).to.equal('Germany // EU')
       }
 
-      for(var i = 11; i < 111; i++) {
+      for(var i = 101; i < 102; i++) {
         await contract.mintTest('Berlin // DE // EU', user1.address)
         expect(wunderPassToJson(await contract.getWunderPass(i)).edition).to.equal('Europe')
       }
-
-      for(var i = 111; i < 115; i++) {
-        await contract.mintTest('Berlin // DE // EU', user1.address)
-        expect(wunderPassToJson(await contract.getWunderPass(i)).edition).to.equal('World')
-      }
-
-      await contract.mintTest('Germany // EU', user1.address)
-      expect(wunderPassToJson(await contract.getWunderPass(115)).edition).to.equal('World')
-
-      await contract.mintTest('Europe', user1.address)
-      expect(wunderPassToJson(await contract.getWunderPass(116)).edition).to.equal('World')
-
-      await contract.mintTest('World', user1.address)
-      expect(wunderPassToJson(await contract.getWunderPass(117)).edition).to.equal('World')
     });
 
     it('Every edition should work', async () => {
